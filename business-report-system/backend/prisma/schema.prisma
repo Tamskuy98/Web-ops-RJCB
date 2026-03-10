@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("warehouse")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Product {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  priceCost Float    @map("price_cost")
+  priceSell Float    @map("price_sell")
+  stock     Int      @default(0)
+  minStock  Int      @default(5) @map("min_stock")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sales         Sale[]
+  incomingGoods IncomingGood[]
+  restocks      Restock[]
+
+  @@map("products")
+}
+
+model Sale {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  quantity  Int
+  priceSell Float    @map("price_sell")
+  total     Float
+  profit    Float
+  date      DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("sales")
+}
+
+model IncomingGood {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  quantity  Int
+  supplier  String
+  date      DateTime @default(now())
+  note      String?
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("incoming_goods")
+}
+
+model Restock {
+  id            Int      @id @default(autoincrement())
+  productId     Int      @map("product_id")
+  quantity      Int
+  purchasePrice Float    @map("purchase_price")
+  supplier      String
+  date          DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("restocks")
+}
