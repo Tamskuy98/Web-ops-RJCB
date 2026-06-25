@@ -1,4 +1,4 @@
-const prisma = require('../prisma/client');
+const prisma = require("../prisma/client");
 
 const getAllSales = async ({ search, startDate, endDate }) => {
   const where = {};
@@ -6,7 +6,7 @@ const getAllSales = async ({ search, startDate, endDate }) => {
   if (startDate && endDate) {
     where.date = {
       gte: new Date(startDate),
-      lte: new Date(endDate + 'T23:59:59.999Z'),
+      lte: new Date(endDate + "T23:59:59.999Z"),
     };
   }
 
@@ -18,15 +18,17 @@ const getAllSales = async ({ search, startDate, endDate }) => {
 
   return prisma.sale.findMany({
     where,
-    include: { product: { select: { name: true, category: true, priceCost: true } } },
-    orderBy: { date: 'desc' },
+    include: {
+      product: { select: { name: true, category: true, priceCost: true } },
+    },
+    orderBy: { date: "desc" },
   });
 };
 
 const createSale = async ({ productId, quantity, priceSell, date }) => {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
-    const error = new Error('Product not found.');
+    const error = new Error("Product not found.");
     error.statusCode = 404;
     throw error;
   }
@@ -65,14 +67,16 @@ const createSale = async ({ productId, quantity, priceSell, date }) => {
 const updateSale = async (id, { productId, quantity, priceSell, date }) => {
   const existingSale = await prisma.sale.findUnique({ where: { id } });
   if (!existingSale) {
-    const error = new Error('Sale not found.');
+    const error = new Error("Sale not found.");
     error.statusCode = 404;
     throw error;
   }
 
-  const product = await prisma.product.findUnique({ where: { id: productId || existingSale.productId } });
+  const product = await prisma.product.findUnique({
+    where: { id: productId || existingSale.productId },
+  });
   if (!product) {
-    const error = new Error('Product not found.');
+    const error = new Error("Product not found.");
     error.statusCode = 404;
     throw error;
   }
@@ -117,7 +121,7 @@ const updateSale = async (id, { productId, quantity, priceSell, date }) => {
 const deleteSale = async (id) => {
   const sale = await prisma.sale.findUnique({ where: { id } });
   if (!sale) {
-    const error = new Error('Sale not found.');
+    const error = new Error("Sale not found.");
     error.statusCode = 404;
     throw error;
   }
@@ -133,4 +137,16 @@ const deleteSale = async (id) => {
   return sale;
 };
 
-module.exports = { getAllSales, createSale, updateSale, deleteSale };
+const sendToWhatsApp = async (data) => {
+  const { phoneNumber, message } = data;
+  // Implementation for sending to WhatsApp
+  // This function can be implemented using a third-party service or API
+};
+
+module.exports = {
+  getAllSales,
+  createSale,
+  updateSale,
+  deleteSale,
+  sendToWhatsApp,
+};

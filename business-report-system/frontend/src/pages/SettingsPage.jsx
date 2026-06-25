@@ -1,4 +1,4 @@
-import { useAuth } from '../context/AuthContext';
+﻿import { useAuth } from "../context/AuthContext";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -8,7 +8,9 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-lg">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">Profile Information</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          Profile Information
+        </h3>
         <div className="space-y-3">
           <div>
             <label className="block text-sm text-gray-500">Name</label>
@@ -20,14 +22,20 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="block text-sm text-gray-500">Role</label>
-            <span className="inline-block mt-0.5 px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium capitalize">{user?.role}</span>
+            <span className="inline-block mt-0.5 px-2.5 py-0.5 bg-red-100 text-red-800 rounded-full text-xs font-medium capitalize">
+              {user?.role}
+            </span>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-lg">
-        <h3 className="text-base font-semibold text-gray-900 mb-2">Application Info</h3>
-        <p className="text-sm text-gray-500">BizReport - Business Report & Stock Management System</p>
+        <h3 className="text-base font-semibold text-gray-900 mb-2">
+          Application Info
+        </h3>
+        <p className="text-sm text-gray-500">
+          RAJACIRENGBEKASI - Business Report & Stock Management System
+        </p>
         <p className="text-sm text-gray-500">Version 1.0.0</p>
       </div>
     </div>

@@ -1,7 +1,12 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export default function Pagination({ totalItems, itemsPerPage = 10, currentPage, onPageChange }) {
+export default function Pagination({
+  totalItems,
+  itemsPerPage = 10,
+  currentPage,
+  onPageChange,
+}) {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   if (totalPages <= 1) return null;
@@ -17,7 +22,8 @@ export default function Pagination({ totalItems, itemsPerPage = 10, currentPage,
   return (
     <div className="flex items-center justify-between mt-4 px-1">
       <p className="text-sm text-gray-600">
-        Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}
+        Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} -{" "}
+        {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}
       </p>
       <div className="flex items-center gap-1">
         <button
@@ -31,7 +37,7 @@ export default function Pagination({ totalItems, itemsPerPage = 10, currentPage,
           <button
             key={p}
             onClick={() => onPageChange(p)}
-            className={`px-3 py-1.5 text-sm rounded-lg ${p === currentPage ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+            className={`px-3 py-1.5 text-sm rounded-lg ${p === currentPage ? "bg-red-600 text-white" : "hover:bg-gray-100 text-gray-700"}`}
           >
             {p}
           </button>

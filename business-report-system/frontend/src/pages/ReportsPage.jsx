@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import api from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatCurrency, formatDate } from '../utils/helpers';
@@ -75,22 +75,22 @@ export default function ReportsPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
             <input type="date" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
             <input type="date" value={filters.endDate} onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
             <select value={filters.productId} onChange={(e) => setFilters({ ...filters, productId: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm">
               <option value="">All Products</option>
               {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <button onClick={fetchReport} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+          <button onClick={fetchReport} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
             Generate
           </button>
           <button onClick={exportCSV} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
@@ -110,7 +110,7 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 text-center">
               <p className="text-sm text-gray-500">Total Sales</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">{formatCurrency(report.summary.totalSales)}</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(report.summary.totalSales)}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 text-center">
               <p className="text-sm text-gray-500">Total Profit</p>

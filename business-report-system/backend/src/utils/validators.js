@@ -46,6 +46,26 @@ const restockSchema = z.object({
   date: z.string().optional(),
 });
 
+// Expense item schema for daily report
+const dailyReportExpenseSchema = z.object({
+  namaBarang: z.string().min(1, 'Item name is required'),
+  qty: z.number().int().positive('Quantity must be positive'),
+  harga: z.number().positive('Unit price must be positive'),
+  total: z.number().positive('Total must be positive'),
+  attachment: z.string().optional(), // Base64 or URL
+});
+
+// Daily report schema (public endpoint - no login required)
+const dailyReportSchema = z.object({
+  productId: z.number().int().positive('Product ID is required'),
+  quantity: z.number().int().positive('Quantity must be positive'),
+  priceSell: z.number().positive().optional(), // defaults to product price
+  qris: z.number().min(0).optional(), // QRIS payment amount
+  expenses: z.array(dailyReportExpenseSchema).optional(), // optional expense list
+  pin: z.string().min(4, 'PIN must be at least 4 characters'), // validation PIN
+  date: z.string().optional(), // defaults to now
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -54,4 +74,6 @@ module.exports = {
   saleSchema,
   incomingSchema,
   restockSchema,
+  dailyReportSchema,
+  dailyReportExpenseSchema,
 };
