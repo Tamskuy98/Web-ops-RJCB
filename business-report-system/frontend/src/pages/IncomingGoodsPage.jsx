@@ -87,12 +87,14 @@ export default function IncomingGoodsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Incoming Goods</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Belanja Operasional
+        </h1>
         <button
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
-          <Plus size={16} /> Add Incoming
+          <Plus size={16} /> Add
         </button>
       </div>
 

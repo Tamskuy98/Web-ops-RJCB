@@ -1,10 +1,14 @@
-const reportService = require('../services/reportService');
-const { sendResponse } = require('../utils/response');
+const reportService = require("../services/reportService");
+const { sendResponse } = require("../utils/response");
 
 const salesReport = async (req, res, next) => {
   try {
     const { startDate, endDate, productId } = req.query;
-    const report = await reportService.getSalesReport({ startDate, endDate, productId });
+    const report = await reportService.getSalesReport({
+      startDate,
+      endDate,
+      productId,
+    });
     sendResponse(res, 200, report);
   } catch (error) {
     next(error);
@@ -23,10 +27,21 @@ const profitReport = async (req, res, next) => {
 
 const revenueShare = async (req, res, next) => {
   try {
-    const { ownerPercentage, partnerPercentage, startDate, endDate } = req.query;
+    const {
+      ownerPercentage,
+      pelakuusahaPercentage,
+      pemilikasettetapPercentage,
+      pemilikasetmahalPercentage,
+      startDate,
+      endDate,
+    } = req.query;
     const report = await reportService.getRevenueShare({
-      ownerPercentage: parseFloat(ownerPercentage) || 60,
-      partnerPercentage: parseFloat(partnerPercentage) || 40,
+      // ownerPercentage: parseFloat(ownerPercentage) || 60,
+      // partnerPercentage: parseFloat(partnerPercentage) || 40,
+      ownerPercentage: parseFloat(ownerPercentage) || 30,
+      pelakuusahaPercentage: parseFloat(pelakuusahaPercentage) || 30,
+      pemilikasettetapPercentage: parseFloat(pemilikasettetapPercentage) || 20,
+      pemilikasetmahalPercentage: parseFloat(pemilikasetmahalPercentage) || 20,
       startDate,
       endDate,
     });
@@ -54,4 +69,10 @@ const dashboard = async (req, res, next) => {
   }
 };
 
-module.exports = { salesReport, profitReport, revenueShare, monthlySales, dashboard };
+module.exports = {
+  salesReport,
+  profitReport,
+  revenueShare,
+  monthlySales,
+  dashboard,
+};

@@ -51,7 +51,9 @@ const getProfitReport = async ({ startDate, endDate }) => {
 
 const getRevenueShare = async ({
   ownerPercentage,
-  partnerPercentage,
+  pelakuusahaPercentage,
+  pemilikasettetapPercentage,
+  pemilikasetmahalPercentage,
   startDate,
   endDate,
 }) => {
@@ -67,15 +69,25 @@ const getRevenueShare = async ({
   const sales = await prisma.sale.findMany({ where });
   const totalProfit = sales.reduce((sum, s) => sum + Number(s.profit), 0);
 
+  // const ownerShare = (totalProfit * ownerPercentage) / 100;
+  // const partnerShare = (totalProfit * partnerPercentage) / 100;
   const ownerShare = (totalProfit * ownerPercentage) / 100;
-  const partnerShare = (totalProfit * partnerPercentage) / 100;
+  const pelakuusahaShare = (totalProfit * pelakuusahaPercentage) / 100;
+  const pemilikasettetapShare =
+    (totalProfit * pemilikasettetapPercentage) / 100;
+  const pemilikasetmahalShare =
+    (totalProfit * pemilikasetmahalPercentage) / 100;
 
   return {
     totalProfit,
     ownerPercentage,
-    partnerPercentage,
+    pelakuusahaPercentage,
+    pemilikasettetapPercentage,
+    pemilikasetmahalPercentage,
     ownerShare: Math.round(ownerShare * 100) / 100,
-    partnerShare: Math.round(partnerShare * 100) / 100,
+    pelakuusahaShare: Math.round(pelakuusahaShare * 100) / 100,
+    pemilikasettetapShare: Math.round(pemilikasettetapShare * 100) / 100,
+    pemilikasetmahalShare: Math.round(pemilikasetmahalShare * 100) / 100,
   };
 };
 

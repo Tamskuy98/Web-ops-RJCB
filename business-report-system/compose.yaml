@@ -1,0 +1,135 @@
+services:
+  ####################################################
+  # BACKEND EXPRESS API
+  ####################################################
+  backend:
+    # Build image dari Dockerfile backend
+    build:
+      context: ./backend
+
+    # Nama container
+    container_name: express_backend
+
+    # Restart otomatis jika crash
+    restart: always
+
+    # Ambil variable dari file .env
+    env_file:
+      - ./backend/.env
+
+    # Port hanya internal
+    # Tidak expose langsung ke internet
+    expose:
+      - "5000"
+
+    # Hubungkan ke network docker
+    networks:
+      - app_network
+
+    # Tunggu database dibuat dulu
+    depends_on:
+      - postgres
+
+  ####################################################
+  # FRONTEND REACT
+  ####################################################
+  frontend:
+    # Build dari folder frontend
+    build:
+      context: ./frontend
+
+    container_name: react_frontend
+
+    restart: always
+
+    # React akan dilayani nginx
+    expose:
+      - "80"
+
+    networks:
+      - app_network
+
+  ####################################################
+  # DATABASE POSTGRESQL
+  ####################################################
+  postgres:
+    db:
+      # Pakai image resmi PostgreSQL
+      image: postgres:16
+
+      container_name: postgres_database
+
+      restart: always
+
+      # Konfigurasi database
+      environment:
+        # User database
+        POSTGRES_USER: ${POSTGRES_USER}
+
+        # Password database
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+        # Nama database
+        POSTGRES_DB: ${POSTGRES_DB}
+
+      # Simpan data permanen
+      volumes:
+        # Nama volume :
+        # lokasi database postgres di container
+        - postgres_data:/var/lib/postgresql/data
+
+      expose:
+        - "5432"
+
+      networks:
+        - app_network
+
+  ####################################################
+  # NGINX REVERSE PROXY
+  ####################################################
+  nginx:
+    build:
+      context: ./nginx
+
+    container_name: nginx_proxy
+
+    restart: always
+
+    ports:
+      # Server port 80
+      # diarahkan ke nginx container port 80
+      - "80:80"
+
+      # SSL nanti
+      - "443:443"
+
+    volumes:
+      # konfigurasi nginx
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+
+      # SSL certificate
+      - ./nginx/certbot/conf:/etc/letsencrypt
+
+      # challenge certbot
+      - ./nginx/certbot/www:/var/www/certbot
+
+    depends_on:
+      - frontend
+      - backend
+
+    networks:
+      - app_network
+
+####################################################
+# DOCKER VOLUME
+# Penyimpanan database permanent
+####################################################
+volumes:
+  postgres_data:
+
+####################################################
+# DOCKER NETWORK
+# komunikasi antar container
+####################################################
+networks:
+  app_network:
