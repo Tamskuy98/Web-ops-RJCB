@@ -120,6 +120,12 @@ services:
     networks:
       - app_network
 
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+
 ####################################################
 # DOCKER VOLUME
 # Penyimpanan database permanent
