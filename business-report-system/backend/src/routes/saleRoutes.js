@@ -3,7 +3,7 @@ const router = express.Router();
 const saleController = require("../controllers/saleController");
 const { authenticate, authorize } = require("../middlewares/auth");
 const validate = require("../middlewares/validate");
-const { saleSchema } = require("../utils/validators");
+const { saleSchema, saleCreateSchema } = require("../utils/validators");
 
 router.use(authenticate);
 
@@ -11,7 +11,7 @@ router.get("/", saleController.getAll);
 router.post(
   "/",
   authorize("admin", "owner"),
-  validate(saleSchema),
+  validate(saleCreateSchema),
   saleController.create,
 );
 router.put(

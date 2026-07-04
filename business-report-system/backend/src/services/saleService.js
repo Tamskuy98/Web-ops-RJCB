@@ -1,3 +1,4 @@
+const { empty } = require("@prisma/client/runtime/library");
 const prisma = require("../prisma/client");
 
 const getAllSales = async ({ search, startDate, endDate }) => {
@@ -11,57 +12,173 @@ const getAllSales = async ({ search, startDate, endDate }) => {
   }
 
   if (search) {
-    where.product = {
-      name: { contains: search },
+    where.sales = {
+      some: {
+        product: {
+          name: { contains: search },
+        },
+      },
     };
   }
 
-  return prisma.sale.findMany({
+  return prisma.hsale.findMany({
     where,
     include: {
-      product: { select: { name: true, category: true, priceCost: true } },
+      sales: {
+        include: {
+          product: {
+            select: { name: true, category: true, priceCost: true },
+          },
+        },
+      },
     },
     orderBy: { date: "desc" },
   });
 };
 
-const createSale = async ({ productId, quantity, priceSell, date }) => {
-  const product = await prisma.product.findUnique({ where: { id: productId } });
-  if (!product) {
-    const error = new Error("Product not found.");
-    error.statusCode = 404;
-    throw error;
-  }
+const createSale = async ({
+  Date: saleDateInput,
+  totalPayment,
+  TotalQuantity,
+  cash,
+  qris,
+  list,
+}) => {
+  const cashAmount = Number(cash) || 0;
+  const qrisAmount = Number(qris) || 0;
+  const totalQuantity = Number(TotalQuantity);
+  const totalPay = Number(totalPayment);
+  const saleDate = saleDateInput ? new Date(saleDateInput) : new Date();
 
-  if (product.stock < quantity) {
-    const error = new Error(`Insufficient stock. Available: ${product.stock}`);
+  const startOfDay = new Date(saleDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(saleDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const existingHeader = await prisma.hsale.findFirst({
+    where: {
+      date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+  });
+
+  if (existingHeader) {
+    const error = new Error(
+      `A sales header already exists for ${saleDate.toISOString().split("T")[0]}.`,
+    );
     error.statusCode = 400;
     throw error;
   }
 
-  const sellPrice = priceSell || Number(product.priceSell);
-  const total = sellPrice * quantity;
-  const profit = (sellPrice - Number(product.priceCost)) * quantity;
+  let costsupply = 0;
+  for (const item of list) {
+    const product = await prisma.product.findUnique({
+      where: { id: item.productid },
+    });
+    if (!product) {
+      const error = new Error(`Product not found: ${item.productid}`);
+      error.statusCode = 404;
+      throw error;
+    }
+    costsupply += Number(product.priceCost) * Number(item.quantity);
+  }
+  const profit = totalPay - costsupply;
 
-  const [sale] = await prisma.$transaction([
-    prisma.sale.create({
+  if (!Array.isArray(list) || list.length === 0) {
+    const error = new Error("Sale list must contain at least one item.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const paymentTotal = cashAmount + qrisAmount;
+  if (paymentTotal !== totalPay) {
+    const error = new Error(
+      `Payment mismatch: cash + qris (${paymentTotal}) must equal totalPayment (${totalPay}).`,
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const allquantity = list.reduce(
+    (sum, item) => sum + Number(item.quantity),
+    0,
+  );
+  if (allquantity !== totalQuantity) {
+    const error = new Error(
+      `TotalQuantity mismatch: sum of item quantities (${allquantity}) must equal TotalQuantity (${totalQuantity}).`,
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const headersale = await prisma.hsale.create({
+    data: {
+      allquantity,
+      total: totalPay,
+      profit: profit,
+      date: saleDate,
+      typePayment:
+        cashAmount > 0 && qrisAmount > 0
+          ? "Cash;Qris"
+          : cashAmount > 0
+            ? "Cash"
+            : "Qris",
+      cash: cashAmount,
+      qris: qrisAmount,
+    },
+  });
+
+  const createdSales = [];
+  for (const item of list) {
+    const product = await prisma.product.findUnique({
+      where: { id: item.productid },
+    });
+    if (!product) {
+      const error = new Error(`Product not found: ${item.productid}`);
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (product.stock < Number(item.quantity)) {
+      const error = new Error(
+        `Insufficient stock for product ${product.name}. Available: ${product.stock}`,
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const priceSell = Number(item.priceSell);
+    const quantity = Number(item.quantity);
+    const total = priceSell * quantity;
+    const profit = (priceSell - Number(product.priceCost)) * quantity;
+
+    const sale = await prisma.sale.create({
       data: {
-        productId,
+        productId: item.productid,
+        hsaleid: headersale.id,
         quantity,
-        priceSell: sellPrice,
+        priceSell,
         total,
         profit,
-        date: date ? new Date(date) : new Date(),
+        date: saleDate,
       },
       include: { product: { select: { name: true, category: true } } },
-    }),
-    prisma.product.update({
-      where: { id: productId },
-      data: { stock: { decrement: quantity } },
-    }),
-  ]);
+    });
 
-  return sale;
+    await prisma.product.update({
+      where: { id: item.productid },
+      data: { stock: { decrement: quantity } },
+    });
+
+    createdSales.push(sale);
+  }
+
+  return {
+    headersale,
+    sales: createdSales,
+  };
 };
 
 const updateSale = async (id, { productId, quantity, priceSell, date }) => {

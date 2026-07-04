@@ -1,9 +1,8 @@
 ﻿import { useState, useEffect } from "react";
 import api from "../services/api";
 import Modal from "../components/Modal";
-import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
-import { formatCurrency, formatDate } from "../utils/helpers";
+import { formatCurrency } from "../utils/helpers";
 import { Plus, Pencil, Trash2, X, Eye } from "lucide-react";
 
 export default function SalesPage() {
@@ -13,8 +12,9 @@ export default function SalesPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [detailDate, setDetailDate] = useState(null);
+  const [selectedHeader, setSelectedHeader] = useState(null);
   const [editId, setEditId] = useState(null);
+
   const [form, setForm] = useState({
     date: "",
     items: [],
@@ -23,10 +23,11 @@ export default function SalesPage() {
       quantity: "",
       priceSell: "",
     },
+    cash: "",
+    qris: "",
   });
+
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(1);
-  const perPage = 10;
 
   const fetchSales = () => {
     setLoading(true);
@@ -40,6 +41,7 @@ export default function SalesPage() {
   useEffect(() => {
     fetchSales();
   }, []);
+
   useEffect(() => {
     api
       .get("/products")
@@ -77,6 +79,8 @@ export default function SalesPage() {
         quantity: "",
         priceSell: "",
       },
+      cash: "",
+      qris: "",
     });
     setModalOpen(true);
   };
@@ -89,6 +93,31 @@ export default function SalesPage() {
       return;
     }
 
+    // Validation: Cash + QRIS must equal Total Penjualan
+    const totalPenjualan = calculateGrandTotal();
+    const cashAmount = parseFloat(form.cash) || 0;
+    const qrisAmount = parseFloat(form.qris) || 0;
+    const totalPayment = cashAmount + qrisAmount;
+
+    if (Math.abs(totalPayment - totalPenjualan) > 0.01) {
+      alert(
+        `Payment mismatch: Cash + QRIS (${formatCurrency(totalPayment)}) must equal Total Penjualan (${formatCurrency(totalPenjualan)})`,
+      );
+      return;
+    }
+
+    if (!editId) {
+      const dateAlreadyExists = sales.some(
+        (sale) => new Date(sale.date).toISOString().split("T")[0] === form.date,
+      );
+      if (dateAlreadyExists) {
+        alert(
+          "A sales header record already exists for this date. Please choose another date.",
+        );
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       if (editId) {
@@ -99,19 +128,28 @@ export default function SalesPage() {
           quantity: Number(item.quantity),
           priceSell: Number(item.priceSell),
           date: form.date,
+          cash: cashAmount,
+          qris: qrisAmount,
         };
         await api.put(`/sales/${editId}`, payload);
       } else {
-        // For create: submit each item as a separate sale
-        for (const item of form.items) {
-          const payload = {
-            productId: Number(item.productId),
+        // For create: submit a single payload with a list of items
+        const payload = {
+          Date: form.date,
+          totalPayment: totalPenjualan,
+          TotalQuantity: form.items.reduce(
+            (sum, item) => sum + Number(item.quantity),
+            0,
+          ),
+          cash: cashAmount,
+          qris: qrisAmount,
+          list: form.items.map((item) => ({
+            productid: Number(item.productId),
             quantity: Number(item.quantity),
             priceSell: Number(item.priceSell),
-            date: form.date,
-          };
-          await api.post("/sales", payload);
-        }
+          })),
+        };
+        await api.post("/sales", payload);
       }
       setModalOpen(false);
       fetchSales();
@@ -176,64 +214,47 @@ export default function SalesPage() {
     }, 0);
   };
 
+  const formatPaymentType = (type) => {
+    if (!type) return "-";
+    if (type === "Cash;Qris") return "Cash || Qris";
+    return type;
+  };
+
+  const getPaymentBadgeClass = (paymentType) => {
+    if (paymentType === "Cash") return "bg-emerald-100 text-emerald-800";
+    if (paymentType === "Qris") return "bg-yellow-100 text-yellow-800";
+    if (paymentType === "Cash || Qris") return "bg-yellow-100 text-yellow-800";
+    return "bg-gray-100 text-gray-700";
+  };
+
   const handleDelete = async (id) => {
     if (!confirm("Delete this sale record?")) return;
     try {
       await api.delete(`/sales/${id}`);
       fetchSales();
+      if (
+        selectedHeader &&
+        selectedHeader.sales?.some((sale) => sale.id === id)
+      ) {
+        setSelectedHeader(null);
+        setDetailModalOpen(false);
+      }
     } catch (err) {
       alert(err.response?.data?.message || "Error deleting sale");
     }
   };
 
-  // Group sales by date
-  const groupSalesByDate = () => {
-    const grouped = {};
-    sales.forEach((sale) => {
-      const dateKey = new Date(sale.date).toISOString().split("T")[0];
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(sale);
-    });
-    return grouped;
+  const getFilteredSales = () => {
+    if (!dateFilter) return sales;
+    return sales.filter(
+      (sale) => new Date(sale.date).toISOString().split("T")[0] === dateFilter,
+    );
   };
 
-  // Get summary for a specific date
-  const getSaleSummaryForDate = (dateKey) => {
-    const grouped = groupSalesByDate();
-    const salesForDate = grouped[dateKey] || [];
-    const totalQty = salesForDate.reduce((sum, s) => sum + s.quantity, 0);
-    const totalProfit = salesForDate.reduce(
-      (sum, s) => sum + Number(s.profit),
-      0,
-    );
-    const totalSales = salesForDate.reduce(
-      (sum, s) => sum + Number(s.total),
-      0,
-    );
-    return { totalQty, totalProfit, totalSales, sales: salesForDate };
-  };
-
-  // Open detail view for a specific date
-  const openDetailView = (dateKey) => {
-    setDetailDate(dateKey);
+  const openDetailView = (header) => {
+    setSelectedHeader(header);
     setDetailModalOpen(true);
   };
-
-  // Filter grouped sales by date filter
-  const getFilteredGroupedSales = () => {
-    const grouped = groupSalesByDate();
-    if (!dateFilter) return grouped;
-
-    const filtered = {};
-    if (grouped[dateFilter]) {
-      filtered[dateFilter] = grouped[dateFilter];
-    }
-    return filtered;
-  };
-
-  const paginated = sales.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div className="space-y-4">
@@ -254,7 +275,6 @@ export default function SalesPage() {
           value={dateFilter}
           onChange={(e) => {
             setDateFilter(e.target.value);
-            setPage(1);
           }}
           className="w-full sm:w-60 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-sm"
         />
@@ -263,6 +283,7 @@ export default function SalesPage() {
       {loading ? (
         <LoadingSpinner />
       ) : (
+        //TABEL RECORD
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -277,6 +298,9 @@ export default function SalesPage() {
                   <th className="text-right py-3 px-4 font-medium text-gray-600">
                     Total Sales
                   </th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-600">
+                    Payment
+                  </th>
                   <th className="text-right py-3 px-4 font-medium text-gray-600">
                     Profit
                   </th>
@@ -286,49 +310,53 @@ export default function SalesPage() {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(getFilteredGroupedSales())
-                  .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
-                  .map(([dateKey, salesForDay]) => {
-                    const summary = getSaleSummaryForDate(dateKey);
-                    return (
-                      <tr
-                        key={dateKey}
-                        className="border-t border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="py-3 px-4 text-gray-600">
-                          {new Date(dateKey).toLocaleDateString("id-ID", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </td>
-                        <td className="py-3 px-4 text-center font-medium text-gray-900">
-                          {summary.totalQty}
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-gray-900">
-                          {formatCurrency(summary.totalSales)}
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-green-600">
-                          {formatCurrency(summary.totalProfit)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => openDetailView(dateKey)}
-                              className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
-                              title="View details"
-                            >
-                              <Eye size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                {Object.keys(getFilteredGroupedSales()).length === 0 && (
+                {getFilteredSales()
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .map((headersale) => (
+                    <tr
+                      key={headersale.id}
+                      className="border-t border-gray-100 hover:bg-gray-50"
+                    >
+                      <td className="py-3 px-4 text-gray-600">
+                        {new Date(headersale.date).toLocaleDateString("id-ID", {
+                          weekday: "short",
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </td>
+                      <td className="py-3 px-4 text-center font-medium text-gray-900">
+                        {headersale.allquantity}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-gray-900">
+                        {formatCurrency(headersale.total)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getPaymentBadgeClass(formatPaymentType(headersale.typePayment))}`}
+                        >
+                          {formatPaymentType(headersale.typePayment)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-green-600">
+                        {formatCurrency(headersale.profit)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openDetailView(headersale)}
+                            className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
+                            title="View details"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                {getFilteredSales().length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                    <td colSpan={6} className="py-8 text-center text-gray-400">
                       No sales found
                     </td>
                   </tr>
@@ -466,7 +494,7 @@ export default function SalesPage() {
                           {product?.name}
                         </p>
                         <p className="text-gray-600">
-                          {item.quantity} Ã— {formatCurrency(item.priceSell)} ={" "}
+                          {item.quantity} x {formatCurrency(item.priceSell)} ={" "}
                           {formatCurrency(itemTotal)}
                         </p>
                       </div>
@@ -496,6 +524,41 @@ export default function SalesPage() {
             </div>
           )}
 
+          {/* PAYMENT INPUTS */}
+          {form.items.length > 0 && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                Payment
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cash
+                  </label>
+                  <input
+                    type="number"
+                    value={form.cash}
+                    onChange={(e) => setForm({ ...form, cash: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    QRIS
+                  </label>
+                  <input
+                    type="number"
+                    value={form.qris}
+                    onChange={(e) => setForm({ ...form, qris: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* SUBMIT BUTTONS */}
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button
@@ -519,10 +582,13 @@ export default function SalesPage() {
       {/* DETAIL MODAL - Show all sales for a specific date */}
       <Modal
         isOpen={detailModalOpen}
-        onClose={() => setDetailModalOpen(false)}
-        title={`Sales Detail - ${detailDate ? new Date(detailDate).toLocaleDateString("id-ID", { weekday: "short", year: "numeric", month: "short", day: "numeric" }) : ""}`}
+        onClose={() => {
+          setSelectedHeader(null);
+          setDetailModalOpen(false);
+        }}
+        title={`Sales Detail - ${selectedHeader ? new Date(selectedHeader.date).toLocaleDateString("id-ID", { weekday: "short", year: "numeric", month: "short", day: "numeric" }) : ""}`}
       >
-        {detailDate && (
+        {selectedHeader && (
           <div className="space-y-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -549,7 +615,7 @@ export default function SalesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getSaleSummaryForDate(detailDate).sales.map((s) => (
+                  {selectedHeader.sales.map((s) => (
                     <tr
                       key={s.id}
                       className="border-t border-gray-100 hover:bg-gray-50"
@@ -602,28 +668,41 @@ export default function SalesPage() {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">Total Quantity:</span>
                 <span className="font-semibold text-gray-900">
-                  {getSaleSummaryForDate(detailDate).totalQty}
+                  {selectedHeader.allquantity}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">Total Sales:</span>
                 <span className="font-semibold text-gray-900">
-                  {formatCurrency(getSaleSummaryForDate(detailDate).totalSales)}
+                  {formatCurrency(selectedHeader.total)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Cash:</span>
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(selectedHeader.cash)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">QRIS:</span>
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(selectedHeader.qris)}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm font-semibold">
-                <span className="text-gray-600">Total Profit:</span>
+                <span className="text-gray-600">Total Profit Net:</span>
                 <span className="text-lg text-green-600">
-                  {formatCurrency(
-                    getSaleSummaryForDate(detailDate).totalProfit,
-                  )}
+                  {formatCurrency(selectedHeader.profit)}
                 </span>
               </div>
             </div>
 
             <div className="flex justify-end pt-4 border-t">
               <button
-                onClick={() => setDetailModalOpen(false)}
+                onClick={() => {
+                  setSelectedHeader(null);
+                  setDetailModalOpen(false);
+                }}
                 className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Close
