@@ -6,7 +6,7 @@ import DailyReportPage from "./pages/DailyReportPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProductsPage from "./pages/ProductsPage";
 import SalesPage from "./pages/SalesPage";
-import IncomingGoodsPage from "./pages/IncomingGoodsPage";
+import OperationalPage from "./pages/OperationalPage";
 import RestockPage from "./pages/RestockPage";
 import WarehouseStockPage from "./pages/WarehouseStockPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -33,7 +33,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="sales" element={<SalesPage />} />
-        <Route path="incoming" element={<IncomingGoodsPage />} />
+        <Route path="operational" element={<OperationalPage />} />
         <Route path="restock" element={<RestockPage />} />
         <Route path="warehouse" element={<WarehouseStockPage />} />
         <Route path="reports" element={<ReportsPage />} />

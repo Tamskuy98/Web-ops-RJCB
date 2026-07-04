@@ -17,7 +17,7 @@ const allMenuItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/products", icon: Package, label: "Products" },
   { to: "/sales", icon: ShoppingCart, label: "Sales" },
-  { to: "/incoming", icon: ArrowDownToLine, label: "Belanja Operasional" },
+  { to: "/operational", icon: ArrowDownToLine, label: "Belanja Operasional" },
   { to: "/restock", icon: RefreshCw, label: "Restock" },
   { to: "/warehouse", icon: Warehouse, label: "Warehouse Stock" },
   { to: "/reports", icon: FileText, label: "Reports" },
@@ -29,7 +29,7 @@ const allMenuItems = [
 const getMenuByRole = (role) => {
   if (role === "operator") {
     return allMenuItems.filter((item) =>
-      ["/", "/sales", "/incoming", "/settings"].includes(item.to),
+      ["/", "/sales", "/operational", "/settings"].includes(item.to),
     );
   }
   if (role === "investor") {
