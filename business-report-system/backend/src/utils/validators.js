@@ -47,7 +47,7 @@ const saleCreateSchema = z.object({
     .min(1, "List must contain at least one item"),
 });
 
-const incomingSchema = z.object({
+const operationalSchema = z.object({
   productId: z.number().int().positive(),
   quantity: z.number().int().positive("Quantity must be positive"),
   supplier: z.string().min(1, "Supplier is required"),
@@ -90,7 +90,7 @@ module.exports = {
   productUpdateSchema,
   saleSchema,
   saleCreateSchema,
-  incomingSchema,
+  operationalSchema,
   restockSchema,
   dailyReportSchema,
   dailyReportExpenseSchema,
