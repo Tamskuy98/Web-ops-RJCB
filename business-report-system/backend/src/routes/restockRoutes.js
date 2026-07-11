@@ -1,13 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const restockController = require('../controllers/restockController');
-const { authenticate, authorize } = require('../middlewares/auth');
-const validate = require('../middlewares/validate');
-const { restockSchema } = require('../utils/validators');
+const restockController = require("../controllers/restockController");
+const { authenticate, authorize } = require("../middlewares/auth");
+const validate = require("../middlewares/validate");
+const { restockSchema } = require("../utils/validators");
 
 router.use(authenticate);
 
-router.get('/', restockController.getAll);
-router.post('/', authorize('admin', 'owner', 'warehouse'), validate(restockSchema), restockController.create);
+router.get("/", restockController.getAll);
+router.post(
+  "/",
+  authorize("admin", "owner", "warehouse"),
+  validate(restockSchema),
+  restockController.create,
+);
+// router.post(
+//   "/",
+//   authorize("admin", "owner", "warehouse"),
+//   restockController.create,
+// );
 
 module.exports = router;

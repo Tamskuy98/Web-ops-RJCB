@@ -1,5 +1,5 @@
-const restockService = require('../services/restockService');
-const { sendResponse } = require('../utils/response');
+const restockService = require("../services/restockService");
+const { sendResponse } = require("../utils/response");
 
 const getAll = async (req, res, next) => {
   try {
@@ -12,8 +12,10 @@ const getAll = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
+    console.log("kesinicoy  ");
+    console.log(req.body);
     const restock = await restockService.createRestock(req.body);
-    sendResponse(res, 201, restock, 'Restock recorded.');
+    sendResponse(res, 201, restock, "Restock recorded.");
   } catch (error) {
     next(error);
   }
