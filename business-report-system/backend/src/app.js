@@ -10,6 +10,7 @@ const restockRoutes = require("./routes/restockRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const exportRoutes = require("./routes/exportRoutes");
 const dailyReportRoutes = require("./routes/dailyReportRoutes");
+const debtRoutes = require("./routes/debtRoutes");
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/restock", restockRoutes);
 app.use("/api/report", reportRoutes);
 app.use("/api/export", exportRoutes);
 app.use("/api/daily-report", dailyReportRoutes);
+app.use("/api/debt-management", debtRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({ success: false, message: "Endpoint not found" });

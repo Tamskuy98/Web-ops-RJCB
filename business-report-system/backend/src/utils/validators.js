@@ -47,23 +47,74 @@ const saleCreateSchema = z.object({
     .min(1, "List must contain at least one item"),
 });
 
-const operationalSchema = z.object({
-  productId: z.number().int().positive(),
-  quantity: z.number().int().positive("Quantity must be positive"),
-  supplier: z.string().min(1, "Supplier is required"),
-  date: z.string().optional(),
-  note: z.string().optional(),
-});
+const operationalSchema = z
+  .object({
+    date: z.string().optional(),
+    supplier: z.string().optional(),
+    attachmentType: z.string().optional(),
+    attachmentUrl: z.string().optional(),
+    attachmentFile: z.any().optional(),
+    cashOnHand: z.coerce.number().min(0).optional(),
+    cashHold: z.coerce.number().min(0).optional(),
+    qris: z.coerce.number().min(0).optional(),
+    totalPaid: z.coerce.number().min(0).optional(),
+    typePayment: z.string().optional(),
+    status: z.string().optional(),
+    note: z.string().optional(),
+    outstandingPay: z.coerce.number().min(0).optional(),
+    items: z
+      .array(
+        z.object({
+          kategoriBarang: z.string().optional(),
+          kategoriLainnyaText: z.string().optional(),
+          jumlahBarang: z.coerce.number().int().positive().optional(),
+          hargaBarang: z.coerce.number().positive().optional(),
+          total: z.coerce.number().positive().optional(),
+          name: z.string().optional(),
+          quantity: z.coerce.number().int().positive().optional(),
+          purchasePrice: z.coerce.number().positive().optional(),
+          price: z.coerce.number().positive().optional(),
+        }),
+      )
+      .optional(),
+    name: z.string().optional(),
+    itemName: z.string().optional(),
+    quantity: z.coerce.number().int().positive().optional(),
+    purchasePrice: z.coerce.number().positive().optional(),
+    price: z.coerce.number().positive().optional(),
+  })
+  .passthrough();
 
-const restockSchema = z.object({
-  productId: z.number().int().positive(),
-  quantity: z.number().int().positive("Quantity must be positive"),
-  purchasePrice: z.number().positive("Purchase price must be positive"),
-  supplier: z.string().min(1, "Supplier is required"),
-  date: z.string().optional(),
-});
+const restockSchema = z
+  .object({
+    date: z.string().optional(),
+    supplier: z.string().optional(),
+    attachmentType: z.string().optional(),
+    attachment: z.string().optional(),
+    // attachmentFile: z.any().optional(),
+    cashOnHand: z.coerce.number().min(0).optional(),
+    cashHold: z.coerce.number().min(0).optional(),
+    qris: z.coerce.number().min(0).optional(),
+    totalPayment: z.coerce.number().min(0).optional(),
+    typePayment: z.string().optional(),
+    status: z.string().optional(),
+    note: z.string().optional(),
+    outstandingPay: z.coerce.number().min(0).optional(),
+    items: z
+      .array(
+        z.object({
+          productid: z.coerce.number().positive().optional(),
+          name: z.string().optional(),
+          qty: z.coerce.number().int().positive().optional(),
+          price: z.coerce.number().positive().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .passthrough();
 
 // Expense item schema for daily report
+
 const dailyReportExpenseSchema = z.object({
   namaBarang: z.string().min(1, "Item name is required"),
   qty: z.number().int().positive("Quantity must be positive"),
@@ -83,6 +134,16 @@ const dailyReportSchema = z.object({
   date: z.string().optional(), // defaults to now
 });
 
+const PaydebtSchema = z.object({
+  TotalPayment: z.coerce.number().min(0).optional(),
+  typePayment: z.string().optional(),
+  cashHand: z.coerce.number().min(0).optional(),
+  cashHold: z.coerce.number().min(0).optional(),
+  qris: z.coerce.number().min(0).optional(),
+  status: z.string().optional(),
+  Date: z.string().optional(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -94,4 +155,5 @@ module.exports = {
   restockSchema,
   dailyReportSchema,
   dailyReportExpenseSchema,
+  PaydebtSchema,
 };
