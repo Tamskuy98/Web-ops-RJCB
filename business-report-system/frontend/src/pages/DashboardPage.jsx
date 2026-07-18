@@ -14,15 +14,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import {
-  ShoppingCart,
-  Wallet,
-  CreditCard,
-  DollarSign,
-  PieChart,
-  Package,
-  AlertTriangle,
-} from "lucide-react";
+
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Cards from "../components/Cards";
@@ -94,7 +86,7 @@ export default function DashboardPage() {
 
   if (loading || !stats) return <LoadingSpinner size="lg" />;
 
-  const formattedMonthlySales = (stats?.monthlySales || []).map((item) => {
+  const formattedMonthlySales = (stats?.charts || []).map((item) => {
     const [year, month] = item.month.split("-");
     const date = new Date(year, parseInt(month) - 1);
     const monthName = date.toLocaleDateString("id-ID", {
@@ -107,13 +99,13 @@ export default function DashboardPage() {
     };
   });
 
-  const formattedDailySales = (stats?.dailySales || []).map((item) => ({
-    ...item,
-    dateDisplay: new Date(item.date).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-    }),
-  }));
+  // const formattedDailySales = (stats?.charts || []).map((item) => ({
+  //   ...item,
+  //   dateDisplay: new Date(item.date).toLocaleDateString("id-ID", {
+  //     day: "numeric",
+  //     month: "short",
+  //   }),
+  // }));
 
   return (
     <div className="space-y-6">
@@ -151,6 +143,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* CARDS */}
       {activeTab === "history" ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -226,10 +219,11 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">
-            Sales per Month
+            Total Penjualan per Bulan (Pcs)
           </h3>
           {formattedMonthlySales.length > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
@@ -243,8 +237,8 @@ export default function DashboardPage() {
                 <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Legend />
                 <Bar
-                  dataKey="totalSales"
-                  name="Sales"
+                  dataKey="sales"
+                  name="Total Penjualan (Pcs)"
                   fill="#3b82f6"
                   radius={[4, 4, 0, 0]}
                 />
@@ -258,6 +252,36 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h3 className="text-base font-semibold text-gray-900 mb-4">
+            Total Pendapatan per Bulan (Rp)
+          </h3>
+          {formattedMonthlySales.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={formattedMonthlySales}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="monthDisplay" tick={{ fontSize: 12 }} />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Legend />
+                <Bar
+                  dataKey="revenue"
+                  name="Total Pendapatan (Rp)"
+                  fill="#3b82f6"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-80 flex items-center justify-center text-gray-400">
+              Tidak ada data penjualan
+            </div>
+          )}
+        </div>
+
+        {/* <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">
             Profit per Month
           </h3>
@@ -287,10 +311,10 @@ export default function DashboardPage() {
               Tidak ada data profit
             </div>
           )}
-        </div>
+        </div> */}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">
             Sales per Day
@@ -331,20 +355,20 @@ export default function DashboardPage() {
             <div className="rounded-2xl bg-gray-50 p-5 border border-gray-100">
               <p className="text-sm text-gray-600">Total Asset Value</p>
               <p className="mt-3 text-3xl font-bold text-gray-900">
-                {/* {formatCurrency(stats.history.totalAssetValue || 0)} */}
+                {formatCurrency(stats.history.totalAssetValue || 0)}
               </p>
             </div>
             <div className="rounded-2xl bg-gray-50 p-5 border border-gray-100">
               <p className="text-sm text-gray-600">Volume Barang Gudang</p>
               <p className="mt-3 text-3xl font-bold text-gray-900">
-                {/* {stats.history.warehouseVolume || 0} */}
+                {stats.history.warehouseVolume || 0}
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
-      {stats?.lowStockProducts?.length > 0 && (
+      {stats?.tables?.lowStockProducts?.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">
             Low Stock Alert
@@ -368,7 +392,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.lowStockProducts.map((p) => (
+                {stats.tables?.lowStockProducts.map((p) => (
                   <tr key={p.id} className="border-b border-gray-100">
                     <td className="py-2 px-3">{p.name}</td>
                     <td className="py-2 px-3">{p.stock}</td>
