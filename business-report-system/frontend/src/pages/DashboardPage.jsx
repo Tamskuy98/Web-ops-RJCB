@@ -110,11 +110,24 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard V2</h1>
-          <p className="text-sm text-gray-600">
-            Pilih tab untuk melihat laporan history atau saldo realtime.
-          </p>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <h4 className="mb-1 text-base font-semibold text-red-700">
+            Deskripsi:
+          </h4>
+
+          <div className="space-y-2 text-sm text-gray-700">
+            <p>
+              <span className="font-semibold text-gray-900">Laporan:</span>{" "}
+              Menampilkan rekap keseluruhan transaksi berdasarkan periode yang
+              dipilih.
+            </p>
+
+            <p>
+              <span className="font-semibold text-gray-900">Saldo:</span>{" "}
+              Menampilkan saldo terkini yang diperbarui secara otomatis setiap
+              terjadi transaksi.
+            </p>
+          </div>
         </div>
 
         <div className="inline-flex rounded-full bg-white border border-gray-200 p-1 shadow-sm">
@@ -127,7 +140,7 @@ export default function DashboardPage() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            History
+            Laporan
           </button>
           <button
             type="button"
@@ -138,7 +151,7 @@ export default function DashboardPage() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Realtime
+            Saldo
           </button>
         </div>
       </div>
@@ -370,21 +383,21 @@ export default function DashboardPage() {
 
       {stats?.tables?.lowStockProducts?.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">
-            Low Stock Alert
+          <h3 className="mb-4 text-lg font-semibold text-red-600">
+            ⚠️ Stok Hampir Habis
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-2 px-3 font-medium text-gray-600">
-                    Product
+                    Produk
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-600">
-                    Current Stock
+                    Stok tersedia
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-600">
-                    Min Stock
+                    Minimal stok
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-600">
                     Status
