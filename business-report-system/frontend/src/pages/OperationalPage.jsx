@@ -11,19 +11,113 @@ const defaultFormState = {
   supplier: "",
   items: [],
   newItem: {
-    kategoriBarang: "gas",
-    kategoriLainnyaText: "",
-    jumlahBarang: "",
-    hargaBarang: "",
+    name: "gas",
+    qty: "",
+    price: "",
   },
+  otherItemName: "",
   attachmentType: "foto",
-  attachmentUrl: "",
   attachmentFile: null,
+  attachmentUrl: "",
   paymentCashOnHand: "",
   paymentCashHold: "",
   paymentQris: "",
   note: "",
 };
+
+const paymentColor = {
+  "CASH ON HAND": "bg-green-100 text-green-700",
+  "CASH HOLD": "bg-blue-100 text-blue-700",
+  QRIS: "bg-yellow-100 text-yellow-700",
+};
+
+// ========================================
+// HELPER FUNCTIONS
+// ========================================
+
+const calculateTotalPayment = (items) => {
+  return items.reduce(
+    (sum, item) => sum + Number(item.qty) * Number(item.price),
+    0,
+  );
+};
+
+const calculateTotalPaid = (cashOnHand, cashHold, qris) => {
+  return Number(cashOnHand || 0) + Number(cashHold || 0) + Number(qris || 0);
+};
+
+const calculateTypePayment = (cashOnHand, cashHold, qris) => {
+  const types = [];
+  if (Number(qris || 0) > 0) types.push("QRIS");
+  if (Number(cashOnHand || 0) > 0) types.push("CASH ON HAND");
+  if (Number(cashHold || 0) > 0) types.push("CASH HOLD");
+  return types.length > 0 ? types.join(";") : "none";
+};
+
+const calculateStatus = (totalPayment, totalPaid) => {
+  return totalPaid >= totalPayment ? "LUNAS" : "HUTANG";
+};
+
+const calculateOutstandingPay = (totalPayment, totalPaid) => {
+  return Math.max(0, totalPayment - totalPaid);
+};
+
+const calculateAllQty = (items) => {
+  return items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+};
+
+const calculateItemTotal = (item) => {
+  return Number(item.qty || 0) * Number(item.price || 0);
+};
+
+const formatTypePayment = (cashOnHand, cashHold, qris) => {
+  const types = [];
+  if (Number(cashOnHand) > 0) types.push("CASH ON HAND");
+  if (Number(cashHold) > 0) types.push("CASH HOLD");
+  if (Number(qris) > 0) types.push("QRIS");
+  return types.length > 0 ? types.join(";") : "-";
+};
+
+// ========================================
+// VALIDATION FUNCTIONS
+// ========================================
+
+const validateForm = (form, totalPayment, totalPaid) => {
+  const errors = [];
+
+  if (!form.date) {
+    errors.push("Tanggal harus diisi");
+  }
+
+  if (!form.supplier?.trim()) {
+    errors.push("Supplier harus diisi");
+  }
+
+  if (!form.items || form.items.length === 0) {
+    errors.push("Minimal tambah 1 item");
+  }
+
+  if (!form.attachmentType) {
+    errors.push("Tipe lampiran harus dipilih");
+  } else {
+    if (form.attachmentType === "foto" && !form.attachmentFile) {
+      errors.push("File foto harus diupload");
+    }
+    if (form.attachmentType === "file" && !form.attachmentUrl?.trim()) {
+      errors.push("URL lampiran harus diisi");
+    }
+  }
+
+  if (totalPaid > totalPayment) {
+    errors.push("Total Dibayar tidak boleh lebih besar dari Total Belanja");
+  }
+
+  return errors;
+};
+
+// ========================================
+// MAIN COMPONENT
+// ========================================
 
 export default function OperationalPage() {
   const [items, setItems] = useState([]);
@@ -32,15 +126,19 @@ export default function OperationalPage() {
   const [form, setForm] = useState(defaultFormState);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
+  const [validationErrors, setValidationErrors] = useState([]);
   const perPage = 10;
 
-  //Get Record
+  // ---- FETCH DATA ----
   const fetchItems = () => {
     setLoading(true);
     api
       .get("/operational")
       .then((res) => setItems(res.data.data))
-      .catch(console.error)
+      .catch((err) => {
+        console.error("Fetch error:", err);
+        alert("Gagal mengambil data");
+      })
       .finally(() => setLoading(false));
   };
 
@@ -48,55 +146,35 @@ export default function OperationalPage() {
     fetchItems();
   }, []);
 
+  // ---- MODAL HANDLERS ----
   const openCreate = () => {
     setForm({
+      ...defaultFormState,
       date: new Date().toISOString().split("T")[0],
-      supplier: "",
-      items: [],
-      newItem: {
-        kategoriBarang: "gas",
-        kategoriLainnyaText: "",
-        jumlahBarang: "",
-        hargaBarang: "",
-      },
-      //attachmentType: "foto", -> Ganti kolom upload
-      attachmentType: "foto",
-      attachmentUrl: "",
-      attachmentFile: null,
-      paymentCashOnHand: "",
-      paymentCashHold: "",
-      paymentQris: "",
-      note: "",
     });
+    setValidationErrors([]);
     setModalOpen(true);
   };
 
-  const totalBelanja = form.items.reduce(
-    (sum, item) => sum + Number(item.jumlahBarang) * Number(item.hargaBarang),
-    0,
-  );
+  const closeModal = () => {
+    setModalOpen(false);
+    setValidationErrors([]);
+    setForm(defaultFormState);
+  };
 
-  const totalPaid =
-    Number(form.paymentCashOnHand || 0) +
-    Number(form.paymentCashHold || 0) +
-    Number(form.paymentQris || 0);
-
+  // ---- CALCULATIONS ----
+  const totalPayment = calculateTotalPayment(form.items);
   const cashOnHand = Number(form.paymentCashOnHand || 0);
   const cashHold = Number(form.paymentCashHold || 0);
   const qris = Number(form.paymentQris || 0);
+  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris);
+  const typePayment = calculateTypePayment(cashOnHand, cashHold, qris);
+  const typePaymentFormatted = formatTypePayment(cashOnHand, cashHold, qris);
+  const status = calculateStatus(totalPayment, totalPaid);
+  const outstandingPay = calculateOutstandingPay(totalPayment, totalPaid);
+  const allQty = calculateAllQty(form.items);
 
-  // build semicolon-separated type string for backend (order: qris;cashonhand;cashhold)
-  const presentTypes = [];
-  if (qris > 0) presentTypes.push("qris");
-  if (cashOnHand > 0) presentTypes.push("cashonhand");
-  if (cashHold > 0) presentTypes.push("cashhold");
-  const typePaymentString = presentTypes.join(";") || "none";
-
-  const paymentTypes =
-    typePaymentString === "none" ? "Belum Bayar" : typePaymentString;
-
-  const status = totalPaid >= totalBelanja ? "Lunas" : "Hutang";
-
+  // ---- ITEM MANAGEMENT ----
   const handleNewItemChange = (field, value) => {
     setForm({
       ...form,
@@ -108,40 +186,46 @@ export default function OperationalPage() {
   };
 
   const addItem = () => {
-    const { kategoriBarang, kategoriLainnyaText, jumlahBarang, hargaBarang } =
-      form.newItem;
-    if (!jumlahBarang || Number(jumlahBarang) <= 0) {
-      alert("Jumlah barang harus diisi dan lebih besar dari 0.");
-      return;
+    const { name, qty, price } = form.newItem;
+
+    const itemErrors = [];
+    if (!qty || Number(qty) <= 0) {
+      itemErrors.push("Jumlah barang harus lebih dari 0");
     }
-    if (!hargaBarang || Number(hargaBarang) <= 0) {
-      alert("Harga barang harus diisi dan lebih besar dari 0.");
-      return;
+    if (!price || Number(price) <= 0) {
+      itemErrors.push("Harga barang harus lebih dari 0");
     }
-    if (kategoriBarang === "lainnya" && !kategoriLainnyaText.trim()) {
-      alert("Silakan isi kategori lainnya.");
+    if (name === "lainnya" && !form.otherItemName?.trim()) {
+      itemErrors.push("Kategori lainnya harus diisi");
+    }
+
+    if (itemErrors.length > 0) {
+      setValidationErrors(itemErrors);
       return;
     }
 
+    const itemName =
+      name === "lainnya"
+        ? form.otherItemName.trim()
+        : name.charAt(0).toUpperCase() + name.slice(1);
+
+    setValidationErrors([]);
     setForm({
       ...form,
       items: [
         ...form.items,
         {
-          kategoriBarang,
-          kategoriLainnyaText:
-            kategoriBarang === "lainnya" ? kategoriLainnyaText.trim() : null,
-          jumlahBarang: Number(jumlahBarang),
-          hargaBarang: Number(hargaBarang),
-          total: Number(jumlahBarang) * Number(hargaBarang),
+          name: itemName,
+          qty: Number(qty),
+          price: Number(price),
         },
       ],
       newItem: {
-        kategoriBarang: "gas",
-        kategoriLainnyaText: "",
-        jumlahBarang: "",
-        hargaBarang: "",
+        name: "gas",
+        qty: "",
+        price: "",
       },
+      otherItemName: "",
     });
   };
 
@@ -152,143 +236,98 @@ export default function OperationalPage() {
     });
   };
 
+  // ---- ATTACHMENT HANDLER ----
   const handleAttachmentChange = (e) => {
     if (form.attachmentType === "foto") {
       setForm({
         ...form,
         attachmentFile: e.target.files?.[0] || null,
       });
-      return;
+    } else {
+      setForm({
+        ...form,
+        attachmentUrl: e.target.value,
+      });
     }
-
-    setForm({
-      ...form,
-      attachmentUrl: e.target.value,
-    });
   };
 
-  const renderItemName = (item) => {
-    if (item.kategoriBarang) {
-      return item.kategoriBarang === "lainnya"
-        ? item.kategoriLainnyaText || "Lainnya"
-        : item.kategoriBarang.replaceAll("_", " ");
-    }
-    if (item.items?.name) return item.items.name;
-    return "-";
-  };
-
-  const renderPaymentLabel = (item) => {
-    if (item.typePayment) {
-      if (item.typePayment === "mixed") return "Cash + QRIS";
-      if (item.typePayment === "cash") return "Cash";
-      if (item.typePayment === "qris") return "QRIS";
-      return item.typePayment;
-    }
-    if (Number(item.cash || 0) > 0 && Number(item.qris || 0) > 0) {
-      return "Cash + QRIS";
-    }
-    if (Number(item.cash || 0) > 0) return "Cash";
-    if (Number(item.qris || 0) > 0) return "QRIS";
-    return "-";
-  };
-
-  const renderItemTotal = (item) => {
-    if (item.total) return Number(item.total);
-    if (item.quantity && item.hargaBarang) {
-      return Number(item.quantity) * Number(item.hargaBarang);
-    }
-    if (item.quantity && item.purchasePrice) {
-      return Number(item.quantity) * Number(item.purchasePrice);
-    }
-    return 0;
-  };
-
+  // ---- SUBMIT HANDLER ----
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (form.items.length === 0) {
-      alert("Please add at least one operational item.");
+    const errors = validateForm(form, totalPayment, totalPaid);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
       return;
     }
-
-    if (!form.attachmentType) {
-      alert("Please select an attachment type.");
-      return;
-    }
-
-    if (form.attachmentType === "foto" && !form.attachmentFile) {
-      alert("Please upload a photo attachment.");
-      return;
-    }
-
-    if (form.attachmentType === "file" && !form.attachmentUrl.trim()) {
-      alert("Please provide an attachment URL.");
-      return;
-    }
-
-    if (totalPaid > totalBelanja) {
-      alert("Total Dibayar tidak boleh lebih besar dari Total Belanja.");
-      return;
-    }
-
-    const cashTotal = cashOnHand + cashHold;
-    const qrisTotal = qris;
-    const typePaymentCode = typePaymentString; // semicolon-separated string or 'none'
-
-    const outstandingPay = Math.max(0, totalBelanja - totalPaid);
 
     setSaving(true);
+    setValidationErrors([]);
+
     try {
       const payload = new FormData();
-      payload.append("date", form.date);
-      payload.append("supplier", form.supplier);
+
+      // Basic info
+      payload.append("date", new Date(form.date).toISOString());
+      payload.append("supplier", form.supplier.trim());
+      payload.append("note", form.note?.trim() || "");
+      payload.append("category", "Operational");
+
+      // Attachment
       payload.append("attachmentType", form.attachmentType);
-      if (form.attachmentType === "foto") {
-        payload.append("attachmentFile", form.attachmentFile);
-      } else {
-        payload.append("attachmentUrl", form.attachmentUrl);
+      if (form.attachmentType === "foto" && form.attachmentFile) {
+        payload.append("attachment", form.attachmentFile);
+      } else if (form.attachmentType === "file") {
+        payload.append("attachment", form.attachmentUrl.trim());
       }
+
+      // Payment info
       payload.append("cashOnHand", cashOnHand);
       payload.append("cashHold", cashHold);
-      payload.append("qris", qrisTotal);
-      payload.append("totalPaid", totalPaid);
-      payload.append("typePayment", typePaymentCode);
+      payload.append("qris", qris);
+      payload.append("totalPayment", totalPayment);
+      payload.append("typePayment", typePayment === "none" ? "" : typePayment);
       payload.append("status", status);
-      payload.append("note", form.note || "");
       payload.append("outstandingPay", outstandingPay);
+      payload.append("allQty", allQty);
 
+      // Items
       form.items.forEach((item, idx) => {
-        payload.append(`items[${idx}][kategoriBarang]`, item.kategoriBarang);
-        payload.append(
-          `items[${idx}][kategoriLainnyaText]`,
-          item.kategoriLainnyaText || "",
-        );
-        payload.append(`items[${idx}][jumlahBarang]`, item.jumlahBarang);
-        payload.append(`items[${idx}][hargaBarang]`, item.hargaBarang);
-        payload.append(`items[${idx}][total]`, renderItemTotal(item));
+        payload.append(`items[${idx}][name]`, item.name);
+        payload.append(`items[${idx}][qty]`, item.qty);
+        payload.append(`items[${idx}][price]`, item.price);
       });
 
       await api.post("/operational", payload, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        // headers: {
+        //   "Content-Type": "multipart/form-data",
+        // },
       });
-      setModalOpen(false);
+
+      closeModal();
       fetchItems();
+      alert("Data operational berhasil disimpan");
     } catch (err) {
-      alert(err.response?.data?.message || "Error");
+      console.error("Submit error:", err);
+      const errorMessage =
+        err.response?.data?.message || "Gagal menyimpan data";
+      setValidationErrors([errorMessage]);
     } finally {
       setSaving(false);
     }
   };
 
+  // ---- DELETE HANDLER ----
   const handleDelete = async (id) => {
-    if (!confirm("Delete this operational expenditure record?")) return;
+    if (!confirm("Hapus data operational ini?")) return;
+
     try {
       await api.delete(`/operational/${id}`);
       fetchItems();
+      alert("Data berhasil dihapus");
     } catch (err) {
-      alert(err.response?.data?.message || "Error");
+      console.error("Delete error:", err);
+      alert(err.response?.data?.message || "Gagal menghapus data");
     }
   };
 
@@ -296,6 +335,7 @@ export default function OperationalPage() {
 
   return (
     <div className="space-y-4">
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">
           Belanja Operasional
@@ -304,10 +344,11 @@ export default function OperationalPage() {
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
-          <Plus size={16} /> Add
+          <Plus size={16} /> Tambah
         </button>
       </div>
 
+      {/* TABLE */}
       {loading ? (
         <LoadingSpinner />
       ) : (
@@ -317,83 +358,91 @@ export default function OperationalPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Date
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-600">
-                    Total Payment
+                    Tanggal
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Payment Type
+                    Supplier
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">
+                    Total Belanja
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">
+                    Tipe Bayar
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
                     Status
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    outstanding debt
+                    Sisa Hutang
                   </th>
                   <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Actions
+                    Aksi
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((item) => {
-                  const total =
-                    Number(item.quantity || 0) *
-                    Number(item.purchasePrice || 0);
-                  const paymentLabel =
-                    item.typePayment === "mixed"
-                      ? "Cash + QRIS"
-                      : item.typePayment === "cash"
-                        ? "Cash"
-                        : item.typePayment === "qris"
-                          ? "QRIS"
-                          : "-";
-                  const categories = {
-                    1: "gas",
-                    2: "minyak",
-                    3: "token_listrik",
-                    4: "plastik_bungkus",
-                    5: "kertas_bungkus",
-                    6: "saus",
-                    7: "lainnya",
-                  };
-                  const category = categories[item.itemsId] || "-";
-                  return (
-                    <tr
-                      key={item.id}
-                      className="border-t border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="py-3 px-4 text-gray-600">
-                        {formatDate(item.date)}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-gray-900">
-                        {category}
-                      </td>
-                      <td className="py-3 px-4 text-right font-medium text-gray-900">
-                        {formatCurrency(total)}
-                      </td>
-                      <td className="py-3 px-4 text-gray-600">
-                        {paymentLabel}
-                      </td>
-                      <td className="py-3 px-4 text-gray-600 capitalize">
+                {paginated.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-t border-gray-300 hover:bg-gray-50"
+                  >
+                    <td className="py-3 px-4 text-gray-600">
+                      {formatDate(item.date)}
+                    </td>
+                    <td className="py-3 px-4 text-gray-700">{item.supplier}</td>
+                    <td className="py-3 px-4 text-left font-medium text-gray-900">
+                      {formatCurrency(item.totalPayment || 0)}
+                    </td>
+                    <td className="py-3 px-4 text-left font-small">
+                      {item.typePayment ? (
+                        <div className="flex flex-wrap gap-2">
+                          {item.typePayment.split(";").map((payment, index) => (
+                            <span
+                              key={index}
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                paymentColor[payment] ||
+                                "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {payment}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+
+                    <td className="py-3 px-4 text-gray-600">
+                      <span
+                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                          item.status === "LUNAS"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
                         {item.status || "-"}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      </span>
+                    </td>
+
+                    <td className="py-3 px-4 text-left text-red-900">
+                      {formatCurrency(item.outstandingPay || 0)}
+                    </td>
+
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
                 {paginated.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400">
-                      No records found
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
+                      Tidak ada data
                     </td>
                   </tr>
                 )}
@@ -411,17 +460,30 @@ export default function OperationalPage() {
         </div>
       )}
 
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Add Operasional"
-      >
+      {/* MODAL */}
+      <Modal isOpen={modalOpen} onClose={closeModal} title="Tambah Operasional">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* header: date + supplier */}
+          {/* VALIDATION ERRORS */}
+          {validationErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="text-sm font-medium text-red-800 mb-2">
+                Validasi Error:
+              </div>
+              <ul className="space-y-1">
+                {validationErrors.map((error, idx) => (
+                  <li key={idx} className="text-sm text-red-700">
+                    • {error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* BASIC INFO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tanggal
+                Tanggal *
               </label>
               <input
                 type="date"
@@ -433,103 +495,108 @@ export default function OperationalPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Supplier
+                Supplier *
               </label>
               <input
                 type="text"
                 value={form.supplier}
                 onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                placeholder="Nama supplier"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                 required
               />
             </div>
           </div>
 
-          {/* item form */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kategori Barang
-              </label>
-              <select
-                value={form.newItem.kategoriBarang}
-                onChange={(e) =>
-                  handleNewItemChange("kategoriBarang", e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-              >
-                <option value="gas">Gas</option>
-                <option value="minyak">Minyak</option>
-                <option value="token_listrik">Token Listrik</option>
-                <option value="plastik_bungkus">Plastik Bungkus</option>
-                <option value="kertas_bungkus">Kertas Bungkus</option>
-                <option value="saus">Saus</option>
-                <option value="lainnya">Lainnya</option>
-              </select>
-
-              {form.newItem.kategoriBarang === "lainnya" && (
-                <div className="mt-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Kategori Lainnya
-                  </label>
-                  <input
-                    type="text"
-                    value={form.newItem.kategoriLainnyaText}
-                    onChange={(e) =>
-                      handleNewItemChange("kategoriLainnyaText", e.target.value)
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                  />
-                </div>
-              )}
-            </div>
+          {/* ITEMS SECTION */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Tambah Item</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Jumlah Barang
+                  Nama Barang
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.newItem.jumlahBarang}
-                  onChange={(e) =>
-                    handleNewItemChange("jumlahBarang", e.target.value)
-                  }
+                <select
+                  value={form.newItem.name}
+                  onChange={(e) => handleNewItemChange("name", e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
+                >
+                  <option value="gas">Gas</option>
+                  <option value="minyak">Minyak</option>
+                  <option value="token_listrik">Token Listrik</option>
+                  <option value="plastik_bungkus">Plastik Bungkus</option>
+                  <option value="kertas_bungkus">Kertas Bungkus</option>
+                  <option value="saus">Saus</option>
+                  <option value="lainnya">Lainnya</option>
+                </select>
+
+                {form.newItem.name === "lainnya" && (
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Kategori Lainnya
+                    </label>
+                    <input
+                      type="text"
+                      value={form.otherItemName}
+                      onChange={(e) =>
+                        setForm({ ...form, otherItemName: e.target.value })
+                      }
+                      placeholder="Sebutkan kategori lainnya"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                    />
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Harga Barang
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.newItem.hargaBarang}
-                  onChange={(e) =>
-                    handleNewItemChange("hargaBarang", e.target.value)
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Jumlah *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.newItem.qty}
+                    onChange={(e) => handleNewItemChange("qty", e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Harga *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.newItem.price}
+                    onChange={(e) =>
+                      handleNewItemChange("price", e.target.value)
+                    }
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end md:col-span-2">
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <Plus size={14} /> Tambah Item
+                </button>
               </div>
             </div>
 
-            <div className="flex justify-end md:col-span-2">
-              <button
-                type="button"
-                onClick={addItem}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                <Plus size={14} /> Tambah Item
-              </button>
-            </div>
-
+            {/* ITEMS LIST */}
             {form.items.length > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 col-span-2">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                 <div className="text-sm font-semibold text-gray-700 mb-3">
-                  Daftar Item
+                  Daftar Belanja ({form.items.length})
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -555,26 +622,26 @@ export default function OperationalPage() {
                     <tbody>
                       {form.items.map((item, index) => (
                         <tr
-                          key={`${item.kategoriBarang}-${index}`}
+                          key={`${item.name}-${index}`}
                           className="border-t border-gray-200"
                         >
                           <td className="py-2 px-3 text-gray-700">
-                            {renderItemName(item)}
+                            {item.name}
+                          </td>
+                          <td className="py-2 px-3 text-center text-gray-700">
+                            {item.qty}
                           </td>
                           <td className="py-2 px-3 text-right text-gray-700">
-                            {item.jumlahBarang}
+                            {formatCurrency(item.price)}
                           </td>
-                          <td className="py-2 px-3 text-right text-gray-700">
-                            {formatCurrency(item.hargaBarang)}
-                          </td>
-                          <td className="py-2 px-3 text-right text-gray-700">
-                            {formatCurrency(item.total)}
+                          <td className="py-2 px-3 text-right font-medium text-gray-900">
+                            {formatCurrency(calculateItemTotal(item))}
                           </td>
                           <td className="py-2 px-3 text-center">
                             <button
                               type="button"
                               onClick={() => removeItem(index)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50"
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                             >
                               <X size={16} />
                             </button>
@@ -588,174 +655,233 @@ export default function OperationalPage() {
             )}
           </div>
 
-          {/* attachment + payments */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Attachment Type
-              </label>
-              <div className="flex gap-3">
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="attachmentType"
-                    value="foto"
-                    checked={form.attachmentType === "foto"}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        attachmentType: e.target.value,
-                        attachmentUrl: "",
-                        attachmentFile: null,
-                      })
-                    }
-                  />
-                  Foto
+          {/* ATTACHMENT */}
+          <div className="space-y-3 border-t pt-3">
+            <h3 className="text-sm font-semibold text-gray-700">Lampiran</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipe Lampiran *
                 </label>
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="attachmentType"
-                    value="file"
-                    checked={form.attachmentType === "file"}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        attachmentType: e.target.value,
-                        attachmentUrl: "",
-                        attachmentFile: null,
-                      })
-                    }
-                  />
-                  Url
+                <div className="space-y-2">
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="attachmentType"
+                      value="foto"
+                      checked={form.attachmentType === "foto"}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          attachmentType: e.target.value,
+                          attachmentUrl: "",
+                          attachmentFile: null,
+                        })
+                      }
+                      className="w-4 h-4"
+                    />
+                    <span>Foto</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="attachmentType"
+                      value="file"
+                      checked={form.attachmentType === "file"}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          attachmentType: e.target.value,
+                          attachmentUrl: "",
+                          attachmentFile: null,
+                        })
+                      }
+                      className="w-4 h-4"
+                    />
+                    <span>URL</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                {form.attachmentType === "foto" ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Upload Foto *
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAttachmentChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                    />
+                    {form.attachmentFile && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        File: {form.attachmentFile.name}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      URL Lampiran *
+                    </label>
+                    <input
+                      type="url"
+                      value={form.attachmentUrl}
+                      onChange={handleAttachmentChange}
+                      placeholder="https://example.com/file.pdf"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* PAYMENT */}
+          <div className="space-y-3 border-t pt-3">
+            <h3 className="text-sm font-semibold text-gray-700">Pembayaran</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cash On Hand
                 </label>
-              </div>
-            </div>
-            <div>
-              {form.attachmentType === "foto" ? (
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAttachmentChange}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.paymentCashOnHand}
+                  onChange={(e) =>
+                    setForm({ ...form, paymentCashOnHand: e.target.value })
+                  }
+                  placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                  required
                 />
-              ) : (
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cash Hold
+                </label>
                 <input
-                  type="text"
-                  value={form.attachmentUrl}
-                  onChange={handleAttachmentChange}
-                  placeholder="Attachment URL"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.paymentCashHold}
+                  onChange={(e) =>
+                    setForm({ ...form, paymentCashHold: e.target.value })
+                  }
+                  placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                  required
                 />
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cash On Hand
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.paymentCashOnHand}
-                onChange={(e) =>
-                  setForm({ ...form, paymentCashOnHand: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cash Hold
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.paymentCashHold}
-                onChange={(e) =>
-                  setForm({ ...form, paymentCashHold: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                QRIS
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.paymentQris}
-                onChange={(e) =>
-                  setForm({ ...form, paymentQris: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Total Bayar
-              </label>
-              <div className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-900">
-                {formatCurrency(totalBelanja)}
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Total Dibayar
-              </label>
-              <div className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-900">
-                {formatCurrency(totalPaid)}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  QRIS
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.paymentQris}
+                  onChange={(e) =>
+                    setForm({ ...form, paymentQris: e.target.value })
+                  }
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                />
               </div>
             </div>
           </div>
 
+          {/* TOTALS & SUMMARY */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-gray-600">Total Belanja:</span>
+                <div className="font-semibold text-lg text-gray-900">
+                  {formatCurrency(totalPayment)}
+                </div>
+              </div>
+              <div>
+                <span className="text-gray-600">Total Dibayar:</span>
+                <div className="font-semibold text-lg text-gray-900">
+                  {formatCurrency(totalPaid)}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 space-y-1 text-sm border-t border-blue-200">
+              <div>
+                <span className="text-gray-600">Status: </span>
+                <span
+                  className={`font-semibold ${
+                    status === "LUNAS" ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {status}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Sisa Hutang: </span>
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(outstandingPay)}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Tipe Bayar: </span>
+                <span className="font-semibold text-gray-900">
+                  {typePaymentFormatted ? (
+                    <div className="flex flex-wrap gap-2">
+                      {typePaymentFormatted.split(";").map((payment, index) => (
+                        <span
+                          key={index}
+                          className={`rounded-full px-3 py-1 text-xs font-small ${
+                            paymentColor[payment]
+                          }`}
+                        >
+                          {payment}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    "-"
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* NOTE */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Note (optional)
+              Catatan (opsional)
             </label>
             <textarea
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
               rows={3}
+              placeholder="Tambahkan catatan jika ada..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="text-sm text-gray-600">
-              Status: <span className="font-semibold capitalize">{status}</span>
-            </div>
-            <div className="text-sm text-gray-600">
-              Payment Type:{" "}
-              <span className="font-semibold">{paymentTypes}</span>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
+          {/* BUTTONS */}
+          <div className="flex justify-end gap-3 pt-2 border-t">
             <button
               type="button"
-              onClick={() => setModalOpen(false)}
-              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              onClick={closeModal}
+              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              Batal
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Menyimpan..." : "Simpan"}
             </button>
           </div>
         </form>
