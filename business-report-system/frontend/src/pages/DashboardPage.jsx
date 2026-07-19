@@ -49,7 +49,7 @@ export default function DashboardPage() {
   const realtimeCards = [
     {
       type: "cashHand",
-      value: stats.cards?.realtimeCashHand,
+      value: formatCurrency(stats.cards?.realtimeCashHand),
     },
     {
       type: "cashHold",
