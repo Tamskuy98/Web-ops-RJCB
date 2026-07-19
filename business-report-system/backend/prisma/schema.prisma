@@ -28,8 +28,8 @@ model Product {
   minStock  Int      @default(5) @map("min_stock")
   createdAt DateTime @default(now()) @map("created_at")
 
-  sales       Sale[]
-  restocks    Restock[]
+  sales             Sale[]
+  restockDetail     RestockDetail[]
 
   @@map("products")
 }
@@ -44,85 +44,104 @@ model Sale {
   profit    Float
   date      DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  headersale Hsale @relation(fields: [hsaleid], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  headersale Hsale   @relation(fields: [hsaleid], references: [id], onDelete: Cascade)
 
   @@map("sales")
 }
 
 model Hsale {
-  id           Int      @id @default(autoincrement())
-  allquantity  Int
-  total        Float
-  profit       Float
-  date         DateTime @default(now())
-  typePayment  String
-  cash         Float
-  qris         Float
+  id          Int      @id @default(autoincrement())
+  allquantity Int
+  total       Float
+  profit      Float
+  date        DateTime @default(now())
+  typePayment String
+  cash        Float
+  qris        Float
+  isDeposit   String @map("is_deposit")
 
-  sales       Sale[]
+  sales Sale[]
 
   @@map("headersale")
 }
 
 model Restock {
-  id             Int      @id @default(autoincrement())
-  productId      Int      @map("product_id")
-  quantity       Int
-  purchasePrice  Float    @map("purchase_price")
-  typePayment    String   @map("type_payment")
-  cash           Float
-  qris           Float
+  id             Int       @id @default(autoincrement())
+  allQty         Int       @map("all_qty")
+  totalPayment   Float     @map("total_payment")
+  typePayment    String    @map("type_payment")
+  cashOnHand     Float     @map("cash_on_hand") @default(0)
+  cashHold       Float     @map("cash_hold") @default(0)
+  qris           Float     @default(0)
   supplier       String
-  date           DateTime @default(now()) @db.Timestamp(3)
-  outstandingPay Float?  @map("outstandingpay")
-  status         String
+  date           DateTime  @default(now()) @db.Timestamp(3)
+  attachment     String?
+  attachmentType String?   @map("attachment_type")
+  note           String?
+  category       String    @default("RESTOCK")
+  outstandingPay Float     @map("outstanding_pay") @default(0)
+  status         String    @default("HUTANG")
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  debt    Debt[]
+  restockDetail  RestockDetail[]
+  debt           Debt[]
 
   @@map("restocks")
 }
 
+model RestockDetail {
+  id        Int     @id @default(autoincrement())
+  restockId Int     @map("restock_id")
+  productId Int     @map("product_id")
+  name      String
+  qty       Int
+  price     Float
+
+  restock Restock @relation(fields: [restockId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("restock_details")
+}
+
 model Qris {
-  id           Int      @id @default(autoincrement())
-  totalPayment Float    @map("total_payment")
+  id           Int       @id @default(autoincrement())
+  totalPayment Float     @map("total_payment")
   status       String
-  date         DateTime @default(now()) @db.Timestamp(3)
+  date         DateTime  @default(now()) @db.Timestamp(3)
 
   @@map("qris")
 }
 
 model Operational {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   allQty         Int
-  typePayment    String   @map("type_payment")
-  totalPayment   Float    @map("total_payment")
-  cashOnHand     Float
-  cashHold       Float
+  typePayment    String    @map("type_payment")
+  totalPayment   Float     @map("total_payment")
+  cashOnHand     Float     @map("cash_on_hand")
+  cashHold       Float     @map("cash_hold")
   qris           Float
   status         String
   supplier       String
-  date           DateTime @default(now()) @db.Timestamp(3)
+  date           DateTime  @default(now()) @db.Timestamp(3)
   attachment     String?
-  attachmentType String?
+  attachmentType String?   @map("attachment_type")
   note           String?
   category       String
-  outstandingPay Float?   @map("outstandingpay")
+  outstandingPay Float?    @map("outstanding_pay")
 
-  debt    Debt[]
+  debt      Debt[]
   opsdetail Opsdetail[]
 
   @@map("operational")
 }
 
 model Opsdetail {
-  id              Int      @id @default(autoincrement())
-  operationalId   Int      @map("operational_id")
-  name            String
-  qty             Int
-  price           Float
+  id            Int    @id @default(autoincrement())
+  operationalId Int    @map("operational_id")
+  name          String
+  qty           Int
+  price         Float
+  totalPrice    Float
 
   operational Operational @relation(fields: [operationalId], references: [id], onDelete: Cascade)
 
@@ -130,31 +149,42 @@ model Opsdetail {
 }
 
 model Paydebt {
-  id           Int      @id @default(autoincrement())
-  totalPayment Float    @map("total_payment")
-  typePayment  String   @map("type_payment")
-  cashHand     Float    @map("cash_hand")
-  cashHold      Float    @map("cash_hold")
+  id           Int       @id @default(autoincrement())
+  totalPayment Float     @map("total_payment")
+  typePayment  String    @map("type_payment")
+  cashHand     Float     @map("cash_hand")
+  cashHold     Float     @map("cash_hold")
   qris         Float
   status       String
-  date         DateTime @default(now()) @db.Timestamp(3)
+  date         DateTime  @default(now()) @db.Timestamp(3)
 
   @@map("paydebt")
 }
 
 model Debt {
-  id             Int      @id @default(autoincrement())
-  totalDebt      Float    @map("totaldebt")
-  nameDebt       String   @map("namedebt")
-  operationalId  Int?     @map("operationalid")
-  restockId      Int?     @map("restockid")
+  id             Int       @id @default(autoincrement())
+  totalDebt      Float     @map("total_debt")
+  nameDebt       String    @map("name_debt")
+  operationalId  Int?      @map("operational_id")
+  restockId      Int?      @map("restock_id")
   type           String
-  outstandingPay Float?   @map("outstandingpay")
+  outstandingPay Float?    @map("outstanding_pay")
   status         String
-  date           DateTime @default(now()) @db.Timestamp(3)
+  date           DateTime  @default(now()) @db.Timestamp(3)
 
   operational Operational? @relation(fields: [operationalId], references: [id], onDelete: Cascade)
-  restock      Restock?     @relation(fields: [restockId], references: [id], onDelete: Cascade)
+  restock     Restock?     @relation(fields: [restockId], references: [id], onDelete: Cascade)
 
   @@map("debt")
+}
+
+
+model Deposit {
+  id             Int      @id @default(autoincrement())
+  hsaleId        String   @map("hsale_id")
+  totalDeposit   Float    @map("total_deposit")
+  receivedBy     String    @map("received_by")
+  date           DateTime  @default(now()) @db.Timestamp(3)
+
+  @@map("deposit")
 }

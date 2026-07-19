@@ -38,7 +38,7 @@ const createoperational = async (payload = {}) => {
 
     //HANDLE TOTALPAYMENT
     const totalPayment = items.reduce(
-      (sum, item) => sum + Number(item.price || 0),
+      (sum, item) => sum + Number(item.totalPrice || 0),
       0,
     );
 
@@ -106,6 +106,7 @@ const createoperational = async (payload = {}) => {
             name: item.name,
             price: Number(item.price || 0),
             qty: Number(item.qty || 0),
+            totalPrice: Number(item.totalPrice || 0),
           })),
         });
       }

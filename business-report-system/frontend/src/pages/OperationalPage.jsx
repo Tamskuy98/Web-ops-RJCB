@@ -296,7 +296,10 @@ export default function OperationalPage() {
         payload.append(`items[${idx}][name]`, item.name);
         payload.append(`items[${idx}][qty]`, item.qty);
         payload.append(`items[${idx}][price]`, item.price);
+        payload.append(`items[${idx}][totalPrice]`, calculateItemTotal(item));
       });
+
+      console.log([...payload.entries()]);
 
       await api.post("/operational", payload, {
         // headers: {
