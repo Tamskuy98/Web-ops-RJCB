@@ -5,6 +5,7 @@ import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatCurrency, getStockStatus } from "../utils/helpers";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import PageHeader from "../components/pageHeader";
 
 const emptyForm = {
   name: "",
@@ -95,7 +96,10 @@ export default function ProductsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Menu Produk</h1>
+        <PageHeader
+          title="Menu Produk"
+          description="kelola data produk, harga, kategori, dan stok untuk mendukung operasional penjualan."
+        />
         <button
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
