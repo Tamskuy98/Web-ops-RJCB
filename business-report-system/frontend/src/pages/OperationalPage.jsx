@@ -4,7 +4,13 @@ import Modal from "../components/Modal";
 import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatDate, formatCurrency } from "../utils/helpers";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, Eye } from "lucide-react";
+import PageHeader from "../components/pageHeader";
+import Cards from "../components/Cards";
+
+// ========================================
+// HELPER REALTIME CARDS
+// ========================================
 
 const defaultFormState = {
   date: "",
@@ -118,16 +124,33 @@ const validateForm = (form, totalPayment, totalPaid) => {
 // ========================================
 // MAIN COMPONENT
 // ========================================
-
 export default function OperationalPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [form, setForm] = useState(defaultFormState);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [validationErrors, setValidationErrors] = useState([]);
   const perPage = 10;
+  const [selectedHeader, setSelectedHeader] = useState(null);
+  const [valueCards, setCards] = useState(0);
+
+  const realtimeCards = [
+    {
+      type: "cashHand",
+      value: formatCurrency(valueCards?.realtimeCashHand),
+    },
+    {
+      type: "cashHold",
+      value: formatCurrency(valueCards?.realtimeCashHold),
+    },
+    {
+      type: "qris",
+      value: formatCurrency(valueCards?.realtimeQris),
+    },
+  ];
 
   // ---- FETCH DATA ----
   const fetchItems = () => {
@@ -142,8 +165,18 @@ export default function OperationalPage() {
       .finally(() => setLoading(false));
   };
 
+  const fetchDataCards = () => {
+    api
+      .get("/report/get-cards")
+      .then((res) => setCards(res.data.data))
+      .catch(console.error);
+  };
+
+  console.log(valueCards);
+
   useEffect(() => {
     fetchItems();
+    fetchDataCards();
   }, []);
 
   // ---- MODAL HANDLERS ----
@@ -320,6 +353,15 @@ export default function OperationalPage() {
     }
   };
 
+  // ---- VIEW DETAIL HANDLER ----
+  const openDetailView = (item) => {
+    // console.log(item);
+    setSelectedHeader(item);
+    // console.log(selectedHeader);
+    // console.log(selectedHeader?.opsdetail);
+    setDetailModalOpen(true);
+  };
+
   // ---- DELETE HANDLER ----
   const handleDelete = async (id) => {
     if (!confirm("Hapus data operational ini?")) return;
@@ -340,9 +382,10 @@ export default function OperationalPage() {
     <div className="space-y-4">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Belanja Operasional
-        </h1>
+        <PageHeader
+          title="Menu Laporan Belanja Operasional"
+          description="Pantau pengeluaran operasional, analisis transaksi, dan laporan belanja berdasarkan periode."
+        />
         <button
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
@@ -418,27 +461,32 @@ export default function OperationalPage() {
 
                     <td className="py-3 px-4 text-gray-600">
                       <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          item.status === "LUNAS"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                        className={`inline-block rounded px-2 py-1 text-xs font-medium ${
+                          item?.debt?.[0]?.status
+                            ?.toUpperCase()
+                            .includes("HUTANG")
+                            ? "bg-red-100 text-red-700"
+                            : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {item.status || "-"}
+                        {(item?.debt?.[0]?.status ?? "LUNAS").toUpperCase()}
                       </span>
                     </td>
 
                     <td className="py-3 px-4 text-left text-red-900">
-                      {formatCurrency(item.outstandingPay || 0)}
+                      {formatCurrency(item.debt?.[0]?.outstandingPay || 0)}
                     </td>
 
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => openDetailView(item)}
+                          className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
+                          title="View details"
+                        >
+                          <Eye size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -742,6 +790,24 @@ export default function OperationalPage() {
             </div>
           </div>
 
+          {/* CARDS */}
+          <div className="space-y-3 border-t pt-3">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Sisa Saldo Operasional
+            </h3>
+            <div className="grid grid-cols-1 gap-1">
+              {realtimeCards.map((card) => (
+                <Cards
+                  key={card.type}
+                  variant="saldo"
+                  type={card.type}
+                  value={card.value}
+                  className="w-full h-20"
+                />
+              ))}
+            </div>
+          </div>
+
           {/* PAYMENT */}
           <div className="space-y-3 border-t pt-3">
             <h3 className="text-sm font-semibold text-gray-700">Pembayaran</h3>
@@ -888,6 +954,158 @@ export default function OperationalPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL VIEW DETAIL */}
+      <Modal
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setSelectedHeader(null);
+          setDetailModalOpen(false);
+        }}
+        title={`Laporan Detail - ${selectedHeader ? new Date(selectedHeader.date).toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : ""}`}
+      >
+        {selectedHeader && (
+          // <div>
+          //   {selectedHeader?.opsdetail?.map((item) => (
+          //     <div key={item.id}>
+          //       <p>{item.name}</p>
+          //       <p>{item.qty}</p>
+          //       <p>{item.price}</p>
+          //       <p>{item.totalPrice}</p>
+          //     </div>
+          //   ))}
+          // </div>
+          <div className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">
+                      Nama Barang
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-gray-600">
+                      Jumlah Barang
+                    </th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600">
+                      Harga Per Barang
+                    </th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600">
+                      Total Harga Barang
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedHeader?.opsdetail?.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-gray-100 hover:bg-gray-50"
+                    >
+                      <td className="py-2 px-3 font-medium text-gray-900">
+                        {item.name}
+                      </td>
+                      <td className="py-2 px-3 text-center">{item.qty}</td>
+                      <td className="py-2 px-3 text-right text-gray-600">
+                        {formatCurrency(item.price)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-gray-600">
+                        {formatCurrency(item.totalPrice)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Summary Section */}
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-base font-semibold text-gray-900">
+                Ringkasan Pembayaran
+              </h3>
+
+              <div className="space-y-3">
+                <div className="flex justify-between border-b pb-3">
+                  <span className="text-gray-500">Total Belanja</span>
+                  <span className="font-semibold">
+                    {formatCurrency(selectedHeader.totalPayment)}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium text-gray-700">
+                    Pembayaran
+                  </p>
+
+                  <div className="space-y-2">
+                    {selectedHeader.cashOnHand > 0 && (
+                      <div className="flex justify-between rounded-lg bg-green-50 px-3 py-2">
+                        <span className="text-green-700">💵 Cash On Hand</span>
+                        <span className="font-semibold text-green-700">
+                          {formatCurrency(selectedHeader.cashOnHand)}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedHeader.cashHold > 0 && (
+                      <div className="flex justify-between rounded-lg bg-yellow-50 px-3 py-2">
+                        <span className="text-yellow-700">🟡 Cash Hold</span>
+                        <span className="font-semibold text-yellow-700">
+                          {formatCurrency(selectedHeader.cashHold)}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedHeader.qris > 0 && (
+                      <div className="flex justify-between rounded-lg bg-blue-50 px-3 py-2">
+                        <span className="text-blue-700">📱 QRIS</span>
+                        <span className="font-semibold text-blue-700">
+                          {formatCurrency(selectedHeader.qris)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Status Hutang</span>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        selectedHeader.debt?.[0]?.status === "LUNAS"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {selectedHeader.debt?.[0]?.status ?? "-"}
+                    </span>
+                  </div>
+
+                  {selectedHeader.debt?.[0]?.outstandingPay > 0 && (
+                    <div className="mt-3 flex justify-between">
+                      <span className="text-gray-500">Sisa Hutang</span>
+                      <span className="font-semibold text-red-600">
+                        {formatCurrency(selectedHeader.debt[0].outstandingPay)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t">
+              <button
+                onClick={() => {
+                  setSelectedHeader(null);
+                  setDetailModalOpen(false);
+                }}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
