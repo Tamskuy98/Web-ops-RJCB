@@ -140,17 +140,33 @@ export default function OperationalPage() {
   const realtimeCards = [
     {
       type: "cashHand",
+      amount: valueCards?.realtimeCashHand ?? 0,
       value: formatCurrency(valueCards?.realtimeCashHand),
     },
     {
       type: "cashHold",
+      amount: valueCards?.realtimeCashHold ?? 0,
       value: formatCurrency(valueCards?.realtimeCashHold),
     },
     {
       type: "qris",
+      amount: valueCards?.realtimeQris ?? 0,
       value: formatCurrency(valueCards?.realtimeQris),
     },
   ];
+
+  const readOnlyMap = Object.fromEntries(
+    realtimeCards.map((card) => [card.type, card.amount <= 0]),
+  );
+
+  const emptyBalance = Object.values(readOnlyMap).every(Boolean);
+
+  const inputClass = (readOnly) =>
+    `w-full rounded-xl border px-3 py-2.5 text-sm transition-all outline-none ${
+      readOnly
+        ? "border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+        : "border-gray-300 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-100"
+    }`;
 
   // ---- FETCH DATA ----
   const fetchItems = () => {
@@ -200,7 +216,7 @@ export default function OperationalPage() {
   const cashOnHand = Number(form.paymentCashOnHand || 0);
   const cashHold = Number(form.paymentCashHold || 0);
   const qris = Number(form.paymentQris || 0);
-  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris);
+  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris) || 0;
   const typePayment = calculateTypePayment(cashOnHand, cashHold, qris);
   const typePaymentFormatted = formatTypePayment(cashOnHand, cashHold, qris);
   const status = calculateStatus(totalPayment, totalPaid);
@@ -319,7 +335,10 @@ export default function OperationalPage() {
       payload.append("cashHold", cashHold);
       payload.append("qris", qris);
       payload.append("totalPayment", totalPayment);
-      payload.append("typePayment", typePayment === "none" ? "" : typePayment);
+      payload.append(
+        "typePayment",
+        typePayment === "none" ? "DIBAYAR DENGAN HUTANG" : typePayment,
+      );
       payload.append("status", status);
       payload.append("outstandingPay", outstandingPay);
       payload.append("allQty", allQty);
@@ -809,115 +828,210 @@ export default function OperationalPage() {
           </div>
 
           {/* PAYMENT */}
-          <div className="space-y-3 border-t pt-3">
-            <h3 className="text-sm font-semibold text-gray-700">Pembayaran</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cash On Hand
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.paymentCashOnHand}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentCashOnHand: e.target.value })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cash Hold
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.paymentCashHold}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentCashHold: e.target.value })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  QRIS
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.paymentQris}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentQris: e.target.value })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
-              </div>
+          <div className="space-y-4 border-t border-gray-200 pt-5">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Pembayaran
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Masukkan nominal pembayaran sesuai saldo operasional yang
+                tersedia.
+              </p>
             </div>
+
+            {emptyBalance && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 text-amber-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v4m0 4h.01M10.29 3.86l-8.18 14A2 2 0 003.82 21h16.36a2 2 0 001.71-3.14l-8.18-14a2 2 0 00-3.42 0z"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <p className="font-medium text-amber-900">
+                    Saldo operasional tidak tersedia
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Transaksi ini akan otomatis dicatat sebagai{" "}
+                    <span className="font-semibold">hutang kepada owner</span>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!emptyBalance && (
+              <div className="space-y-4">
+                {/* Cash On Hand */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                    <span>Cash On Hand</span>
+
+                    {readOnlyMap.cashHand && (
+                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                        Saldo Habis
+                      </span>
+                    )}
+                  </label>
+
+                  <input
+                    readOnly={readOnlyMap.cashHand}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.paymentCashOnHand}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentCashOnHand: e.target.value })
+                    }
+                    placeholder="0"
+                    className={inputClass(readOnlyMap.cashHand)}
+                  />
+                </div>
+
+                {/* Cash Hold */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                    <span>Cash Hold</span>
+
+                    {readOnlyMap.cashHold && (
+                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                        Saldo Habis
+                      </span>
+                    )}
+                  </label>
+
+                  <input
+                    readOnly={readOnlyMap.cashHold}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.paymentCashHold}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentCashHold: e.target.value })
+                    }
+                    placeholder="0"
+                    className={inputClass(readOnlyMap.cashHold)}
+                  />
+                </div>
+
+                {/* QRIS */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                    <span>QRIS</span>
+
+                    {readOnlyMap.qris && (
+                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                        Saldo Habis
+                      </span>
+                    )}
+                  </label>
+
+                  <input
+                    readOnly={readOnlyMap.qris}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.paymentQris}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentQris: e.target.value })
+                    }
+                    placeholder="0"
+                    className={inputClass(readOnlyMap.qris)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* TOTALS & SUMMARY */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex items-center justify-between">
               <div>
-                <span className="text-gray-600">Total Belanja:</span>
-                <div className="font-semibold text-lg text-gray-900">
-                  {formatCurrency(totalPayment)}
-                </div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Ringkasan Pembayaran
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Informasi total pembayaran dan status transaksi.
+                </p>
               </div>
-              <div>
-                <span className="text-gray-600">Total Dibayar:</span>
-                <div className="font-semibold text-lg text-gray-900">
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  status === "LUNAS"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {status}
+              </span>
+            </div>
+
+            {/* Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Total Belanja</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {formatCurrency(totalPayment)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Total Dibayar</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
                   {formatCurrency(totalPaid)}
-                </div>
+                </p>
               </div>
             </div>
 
-            <div className="pt-2 space-y-1 text-sm border-t border-blue-200">
-              <div>
-                <span className="text-gray-600">Status: </span>
+            {/* Detail */}
+            <div className="mt-5 space-y-4 border-t border-slate-200 pt-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Sisa Hutang</span>
+
                 <span
-                  className={`font-semibold ${
-                    status === "LUNAS" ? "text-green-600" : "text-red-600"
+                  className={`text-lg font-bold ${
+                    outstandingPay > 0 ? "text-red-600" : "text-green-600"
                   }`}
                 >
-                  {status}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Sisa Hutang: </span>
-                <span className="font-semibold text-gray-900">
                   {formatCurrency(outstandingPay)}
                 </span>
               </div>
-              <div>
-                <span className="text-gray-600">Tipe Bayar: </span>
-                <span className="font-semibold text-gray-900">
-                  {typePaymentFormatted ? (
-                    <div className="flex flex-wrap gap-2">
-                      {typePaymentFormatted.split(";").map((payment, index) => (
-                        <span
-                          key={index}
-                          className={`rounded-full px-3 py-1 text-xs font-small ${
-                            paymentColor[payment]
-                          }`}
-                        >
-                          {payment}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    "-"
-                  )}
+
+              <div className="flex items-start justify-between gap-4">
+                <span className="pt-1 text-sm text-slate-500 whitespace-nowrap">
+                  Tipe Pembayaran
                 </span>
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  {emptyBalance ? (
+                    <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                      DIBAYAR DENGAN HUTANG
+                    </span>
+                  ) : typePaymentFormatted ? (
+                    typePaymentFormatted.split(";").map((payment, index) => (
+                      <span
+                        key={index}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          paymentColor[payment]
+                        }`}
+                      >
+                        {payment}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-slate-400">-</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
