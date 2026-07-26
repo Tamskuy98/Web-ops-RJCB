@@ -126,7 +126,9 @@ const createSale = async ({
             ? "Cash"
             : "Qris",
       cash: cashAmount,
+      cashReport: cashAmount,
       qris: qrisAmount,
+      isDeposit: "N",
     },
   });
 

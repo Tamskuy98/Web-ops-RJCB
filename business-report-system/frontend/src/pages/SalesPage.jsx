@@ -459,6 +459,9 @@ export default function SalesPage() {
                         Total Keuntungan
                       </th>
                       <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Setoran
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
                         status
                       </th>
                       <th className="text-center py-3 px-4 font-medium text-gray-600">
@@ -509,7 +512,7 @@ export default function SalesPage() {
                             )}
                           </td>
                           <td className="py-3 px-4 text-center font-medium text-gray-900">
-                            {formatCurrency(headersale.cash || 0)}
+                            {formatCurrency(headersale.cashReport || 0)}
                           </td>
                           <td className="py-3 px-4 text-center font-medium text-gray-900">
                             {formatCurrency(headersale.qris || 0)}
@@ -525,6 +528,9 @@ export default function SalesPage() {
                           </td>
                           <td className="py-3 px-4 text-center font-medium text-green-600">
                             {formatCurrency(headersale.profit)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                            {formatCurrency(headersale.cash || 0)}
                           </td>
                           <td className="py-3 px-4 text-center font-medium text-green-600">
                             <span
