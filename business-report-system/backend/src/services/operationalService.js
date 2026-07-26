@@ -1,4 +1,5 @@
 const prisma = require("../prisma/client");
+const { useCashHold } = require("./depositService.js");
 
 const getAlloperational = async () => {
   return prisma.operational.findMany({
@@ -105,6 +106,10 @@ const createoperational = async (payload = {}) => {
           outstandingPay: outstandingPay,
         },
       });
+
+      if (cashHold > 0) {
+        await useCashHold(cashHold);
+      }
 
       // Create operational details
       if (items.length > 0) {
