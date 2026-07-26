@@ -1,4 +1,5 @@
 const prisma = require("../prisma/client");
+const { useCashHold } = require("./depositService.js");
 
 const getAllRestocks = async () => {
   return prisma.restock.findMany({
@@ -109,6 +110,10 @@ const createRestock = async (payload = {}) => {
           status: status,
         },
       });
+
+      if (cashHold > 0) {
+        await useCashHold(cashHold);
+      }
 
       // CREATE RESTOCK DETAILS & UPDATE PRODUCT STOCK
       for (const item of items) {
