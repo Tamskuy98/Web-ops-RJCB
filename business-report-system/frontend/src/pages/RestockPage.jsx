@@ -5,6 +5,7 @@ import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatDate, formatCurrency } from "../utils/helpers";
 import { Plus, Trash2, Eye, X } from "lucide-react";
+import Cards from "../components/Cards";
 
 const defaultFormState = {
   date: "",
@@ -126,6 +127,45 @@ export default function RestockPage() {
   const [page, setPage] = useState(1);
   const [validationErrors, setValidationErrors] = useState([]);
   const perPage = 10;
+  const [valueCards, setCards] = useState(0);
+
+  const realtimeCards = [
+    {
+      type: "cashHand",
+      amount: valueCards?.realtimeCashHand ?? 0,
+      value: formatCurrency(valueCards?.realtimeCashHand),
+    },
+    {
+      type: "cashHold",
+      amount: valueCards?.realtimeCashHold ?? 0,
+      value: formatCurrency(valueCards?.realtimeCashHold),
+    },
+    {
+      type: "qris",
+      amount: valueCards?.realtimeQris ?? 0,
+      value: formatCurrency(valueCards?.realtimeQris),
+    },
+  ];
+
+  const readOnlyMap = Object.fromEntries(
+    realtimeCards.map((card) => [card.type, card.amount <= 0]),
+  );
+
+  const emptyBalance = Object.values(readOnlyMap).every(Boolean);
+
+  const inputClass = (readOnly) =>
+    `w-full rounded-xl border px-3 py-2.5 text-sm transition-all outline-none ${
+      readOnly
+        ? "border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+        : "border-gray-300 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-100"
+    }`;
+
+  const fetchDataCards = () => {
+    api
+      .get("/report/get-cards")
+      .then((res) => setCards(res.data.data))
+      .catch(console.error);
+  };
 
   // ---- FETCH DATA ----
   const fetchRestocks = () => {
@@ -144,6 +184,7 @@ export default function RestockPage() {
 
   useEffect(() => {
     fetchRestocks();
+    fetchDataCards();
   }, []);
 
   // ---- MODAL HANDLERS ----
@@ -305,7 +346,10 @@ export default function RestockPage() {
       payload.append("cashHold", cashHold);
       payload.append("qris", qris);
       payload.append("totalPayment", totalPayment);
-      payload.append("typePayment", typePayment);
+      payload.append(
+        "typePayment",
+        typePayment === "none" ? "DIBAYAR DENGAN HUTANG" : typePayment,
+      );
       payload.append("status", status);
       payload.append("outstandingPay", outstandingPay);
       payload.append("allQty", allQty);
@@ -769,60 +813,140 @@ export default function RestockPage() {
             </div>
           </div> */}
 
+          {/* CARDS */}
+          <div className="space-y-3 border-t pt-3">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Sisa Saldo Operasional
+            </h3>
+            <div className="grid grid-cols-1 gap-1">
+              {realtimeCards.map((card) => (
+                <Cards
+                  key={card.type}
+                  variant="saldo"
+                  type={card.type}
+                  value={card.value}
+                  className="w-full h-20"
+                />
+              ))}
+            </div>
+          </div>
+
           {/* PAYMENT */}
           <div className="border-b pb-4">
             <h3 className="font-semibold text-gray-900 mb-3">Pembayaran</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cash On Hand
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.paymentCashOnHand}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentCashOnHand: e.target.value })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
+            {emptyBalance && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 text-amber-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v4m0 4h.01M10.29 3.86l-8.18 14A2 2 0 003.82 21h16.36a2 2 0 001.71-3.14l-8.18-14a2 2 0 00-3.42 0z"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <p className="font-medium text-amber-900">
+                    Saldo operasional tidak tersedia
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Transaksi ini akan otomatis dicatat sebagai{" "}
+                    <span className="font-semibold">hutang kepada owner</span>.
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cash Hold
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.paymentCashHold}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentCashHold: e.target.value })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
+            )}
+
+            {!emptyBalance && (
+              <div className="space-y-4">
+                {/* Cash On Hand */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                    <span>Cash On Hand</span>
+
+                    {readOnlyMap.cashHand && (
+                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                        Saldo Habis
+                      </span>
+                    )}
+                  </label>
+
+                  <input
+                    readOnly={readOnlyMap.cashHand}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.paymentCashOnHand}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentCashOnHand: e.target.value })
+                    }
+                    placeholder="0"
+                    className={inputClass(readOnlyMap.cashHand)}
+                  />
+                </div>
+
+                {/* Cash Hold */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                    <span>Cash Hold</span>
+
+                    {readOnlyMap.cashHold && (
+                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                        Saldo Habis
+                      </span>
+                    )}
+                  </label>
+
+                  <input
+                    readOnly={readOnlyMap.cashHold}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.paymentCashHold}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentCashHold: e.target.value })
+                    }
+                    placeholder="0"
+                    className={inputClass(readOnlyMap.cashHold)}
+                  />
+                </div>
+
+                {/* QRIS */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                    <span>QRIS</span>
+
+                    {readOnlyMap.qris && (
+                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                        Saldo Habis
+                      </span>
+                    )}
+                  </label>
+
+                  <input
+                    readOnly={readOnlyMap.qris}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.paymentQris}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentQris: e.target.value })
+                    }
+                    placeholder="0"
+                    className={inputClass(readOnlyMap.qris)}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  QRIS
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.paymentQris}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentQris: e.target.value })
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* TOTALS & SUMMARY */}
