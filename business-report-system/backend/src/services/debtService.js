@@ -1,5 +1,6 @@
 const { empty } = require("@prisma/client/runtime/library");
 const prisma = require("../prisma/client");
+const { useCashHold } = require("./depositService.js");
 
 const getAllDebt = async ({ search, startDate, endDate }) => {
   const where = {};
@@ -31,15 +32,15 @@ const payDebt = async (payload = {}) => {
   const data = payload;
 
   console.log(data);
-  if (!data?.typePayment) {
-    throw new Error("typePayment is required");
-  }
+  // if (!data?.typePayment) {
+  //   throw new Error("typePayment is required");
+  // }
   //validasi
   const totalPayment = data.cashHand + data.cashHold + data.qris;
 
-  if (totalPayment !== data.totalPayment) {
-    throw new Error("Total Payment not Match");
-  }
+  // if (totalPayment !== data.totalPayment) {
+  //   throw new Error("Total Payment not Match");
+  // }
 
   const tempType = [];
   if (Number(data.cashHand) > 0) tempType.push("CASH ON HAND");
@@ -117,6 +118,10 @@ const payDebt = async (payload = {}) => {
       }
 
       updatedDebts.push(updated);
+    }
+
+    if (data.cashHold > 0) {
+      await useCashHold(data.cashHold);
     }
 
     return {
