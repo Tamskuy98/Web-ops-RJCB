@@ -144,6 +144,12 @@ const PaydebtSchema = z.object({
   Date: z.string().optional(),
 });
 
+const depositCreateSchema = z.object({
+  id: z.array(z.number()).min(1, "select one data"),
+  totalDeposit: z.coerce.number().min(0),
+  Date: z.string().optional(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -156,4 +162,5 @@ module.exports = {
   dailyReportSchema,
   dailyReportExpenseSchema,
   PaydebtSchema,
+  depositCreateSchema,
 };
