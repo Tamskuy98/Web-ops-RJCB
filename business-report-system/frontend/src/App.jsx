@@ -12,6 +12,7 @@ import WarehouseStockPage from "./pages/WarehouseStockPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProfitSharePage from "./pages/ProfitSharePage";
 import WhatsappServicePage from "./pages/WhatsappServicePage";
+import ManagementDebtPage from "./pages/ManagementDebtPage";
 import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="operational" element={<OperationalPage />} />
         <Route path="restock" element={<RestockPage />} />
         <Route path="warehouse" element={<WarehouseStockPage />} />
+        <Route path="management-debt" element={<ManagementDebtPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="profit-share" element={<ProfitSharePage />} />
         <Route path="whatsapp-service" element={<WhatsappServicePage />} />

@@ -11,6 +11,7 @@ import {
   FileText,
   PieChart,
   Settings,
+  BadgeAlert,
 } from "lucide-react";
 
 const allMenuItems = [
@@ -20,6 +21,7 @@ const allMenuItems = [
   { to: "/operational", icon: ArrowDownToLine, label: "Belanja Operasional" },
   { to: "/restock", icon: RefreshCw, label: "Restock" },
   { to: "/warehouse", icon: Warehouse, label: "Warehouse Stock" },
+  { to: "/management-debt", icon: BadgeAlert, label: "Management Debt" },
   { to: "/reports", icon: FileText, label: "Reports" },
   { to: "/profit-share", icon: PieChart, label: "Profit Share" },
   { to: "/whatsapp-service", icon: PieChart, label: "Whatsapp Service" },
