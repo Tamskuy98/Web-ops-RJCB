@@ -3,7 +3,10 @@ const { useCashHold } = require("./depositService.js");
 
 const getAllRestocks = async () => {
   return prisma.restock.findMany({
-    include: { restockDetail: { select: { productId: true, name: true } } },
+    include: {
+      restockDetail: true,
+      debt: true,
+    },
     orderBy: { date: "desc" },
   });
 };
