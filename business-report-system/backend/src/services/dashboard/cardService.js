@@ -109,13 +109,9 @@ const getCards = async (where) => {
     (salesCashDeposit._sum.cash ?? 0) -
     (operationalSummary._sum.cashOnHand ?? 0) -
     (restockSummary._sum.cashOnHand ?? 0) -
-    (payDebtSummary._sum.cashOnHand ?? 0);
+    (payDebtSummary._sum.cashHand ?? 0);
 
-  const realtimeCashHold =
-    (salesCashHold._sum.cash ?? 0) -
-    // (operationalSummary._sum.cashHold ?? 0) -
-    (restockSummary._sum.cashHold ?? 0) -
-    (payDebtSummary._sum.cashHold ?? 0);
+  const realtimeCashHold = salesCashHold._sum.cash ?? 0;
 
   console.log("ini sales" + salesCashHold._sum.cash);
   console.log("ini ops" + operationalSummary._sum.cashHold);
