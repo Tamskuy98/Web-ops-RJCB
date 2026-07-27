@@ -93,17 +93,6 @@ const validateForm = (form, totalPayment, totalPaid) => {
     errors.push("Minimal tambah 1 item");
   }
 
-  // if (!form.attachmentType) {
-  //   errors.push("Tipe lampiran harus dipilih");
-  // } else {
-  //   if (form.attachmentType === "foto" && !form.attachmentFile) {
-  //     errors.push("File foto harus diupload");
-  //   }
-  //   if (form.attachmentType === "url" && !form.attachmentUrl?.trim()) {
-  //     errors.push("URL lampiran harus diisi");
-  //   }
-  // }
-
   if (totalPaid > totalPayment) {
     errors.push("Total Dibayar tidak boleh lebih besar dari Total Belanja");
   }
@@ -129,6 +118,42 @@ export default function RestockPage() {
   const perPage = 10;
   const [valueCards, setCards] = useState(0);
 
+  // ---- FETCH DATA ----
+  const fetchRestocks = () => {
+    setLoading(true);
+    Promise.all([api.get("/restock"), api.get("/products")])
+      .then(([resStock, resProduct]) => {
+        setRestocks(resStock.data.data);
+        setProducts(resProduct.data.data);
+      })
+      .catch((err) => {
+        console.error("Fetch error:", err);
+        alert("Gagal mengambil data");
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchRestocks();
+    fetchDataCards();
+  }, []);
+
+  const paginated = restocks.slice((page - 1) * perPage, page * perPage);
+
+  // ---- HANDLE CALCULATIONS ----
+  const totalPayment = Number(calculateTotalPayment(form.items));
+  // console.log(totalPayment);
+  const cashOnHand = Number(form.paymentCashOnHand || 0);
+  const cashHold = Number(form.paymentCashHold || 0);
+  const qris = Number(form.paymentQris || 0);
+  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris);
+  const typePayment = calculateTypePayment(cashOnHand, cashHold, qris);
+  const typePaymentFormatted = formatTypePayment(cashOnHand, cashHold, qris);
+  const status = calculateStatus(totalPayment, totalPaid);
+  const outstandingPay = calculateOutstandingPay(totalPayment, totalPaid);
+  const allQty = calculateAllQty(form.items);
+
+  // ---- CHECK AND BALANCE SALDO ----
   const realtimeCards = [
     {
       type: "cashHand",
@@ -153,6 +178,17 @@ export default function RestockPage() {
 
   const emptyBalance = Object.values(readOnlyMap).every(Boolean);
 
+  const allPayment = {
+    cashHand: cashOnHand,
+    cashHold: cashHold,
+    qris: qris,
+  };
+
+  const insufficientBalance = realtimeCards.find((card) => {
+    const payment = allPayment[card.type] ?? 0;
+    return payment > card.amount;
+  });
+
   const inputClass = (readOnly) =>
     `w-full rounded-xl border px-3 py-2.5 text-sm transition-all outline-none ${
       readOnly
@@ -166,26 +202,6 @@ export default function RestockPage() {
       .then((res) => setCards(res.data.data))
       .catch(console.error);
   };
-
-  // ---- FETCH DATA ----
-  const fetchRestocks = () => {
-    setLoading(true);
-    Promise.all([api.get("/restock"), api.get("/products")])
-      .then(([resStock, resProduct]) => {
-        setRestocks(resStock.data.data);
-        setProducts(resProduct.data.data);
-      })
-      .catch((err) => {
-        console.error("Fetch error:", err);
-        alert("Gagal mengambil data");
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchRestocks();
-    fetchDataCards();
-  }, []);
 
   // ---- MODAL HANDLERS ----
   const openCreate = () => {
@@ -207,18 +223,6 @@ export default function RestockPage() {
     setSelectedRestock(restock);
     setViewModalOpen(true);
   };
-
-  // ---- CALCULATIONS ----
-  const totalPayment = calculateTotalPayment(form.items);
-  const cashOnHand = Number(form.paymentCashOnHand || 0);
-  const cashHold = Number(form.paymentCashHold || 0);
-  const qris = Number(form.paymentQris || 0);
-  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris);
-  const typePayment = calculateTypePayment(cashOnHand, cashHold, qris);
-  const typePaymentFormatted = formatTypePayment(cashOnHand, cashHold, qris);
-  const status = calculateStatus(totalPayment, totalPaid);
-  const outstandingPay = calculateOutstandingPay(totalPayment, totalPaid);
-  const allQty = calculateAllQty(form.items);
 
   // ---- ITEM MANAGEMENT ----
   const handleNewItemChange = (field, value) => {
@@ -319,6 +323,10 @@ export default function RestockPage() {
       return;
     }
 
+    if (insufficientBalance) {
+      return alert("Input pembayaran melebihi saldo yang tersedia");
+    }
+
     setSaving(true);
     setValidationErrors([]);
 
@@ -348,7 +356,7 @@ export default function RestockPage() {
       payload.append("totalPayment", totalPayment);
       payload.append(
         "typePayment",
-        typePayment === "none" ? "DIBAYAR DENGAN HUTANG" : typePayment,
+        typePayment === "" ? "DIBAYAR DENGAN HUTANG" : typePayment,
       );
       payload.append("status", status);
       payload.append("outstandingPay", outstandingPay);
@@ -395,8 +403,6 @@ export default function RestockPage() {
     }
   };
 
-  const paginated = restocks.slice((page - 1) * perPage, page * perPage);
-
   return (
     <div className="space-y-4">
       {/* HEADER */}
@@ -437,7 +443,7 @@ export default function RestockPage() {
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
                     Tipe Bayar
                   </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
+                  <th className="text-center py-3 px-4 font-medium text-gray-600">
                     Status
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
@@ -487,20 +493,20 @@ export default function RestockPage() {
                       )}
                     </td>
 
-                    <td className="py-3 px-4 text-gray-600">
+                    <td className="py-3 px-4 text-gray-600 text-center">
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          item.status === "LUNAS"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
+                          item?.debt?.[0]?.status === "HUTANG"
+                            ? "bg-red-500 text-white"
+                            : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {item.status || "-"}
+                        {item?.debt?.[0]?.status || "LUNAS "}
                       </span>
                     </td>
 
                     <td className="py-3 px-4 text-left text-red-900">
-                      {formatCurrency(item.outstandingPay || 0)}
+                      {formatCurrency(item?.debt?.[0]?.outstandingPay || 0)}
                     </td>
 
                     <td className="py-3 px-4 text-center space-x-2 flex items-center justify-center">

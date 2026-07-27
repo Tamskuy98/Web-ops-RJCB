@@ -53,7 +53,7 @@ const createRestock = async (payload = {}) => {
     const qris = Number(data.qris || 0);
 
     const cekPayment = cashOnHand + cashHold + qris;
-    if (Number(cekPayment) >= Number(totalPayment)) {
+    if (Number(cekPayment) > Number(totalPayment)) {
       throw new Error("Total Payment not Match");
     }
 
