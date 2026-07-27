@@ -1,3 +1,8 @@
+const { getCards } = require("./dashboard/cardService");
+const { getCartsSalesPerMount } = require("./dashboard/chartService");
+const { getLowProduct } = require("./dashboard/tableService");
+
+// const { getTables } = require("./dashboard/tables.service");
 const prisma = require("../prisma/client");
 
 const getSalesReport = async ({ startDate, endDate, productId }) => {
@@ -115,56 +120,83 @@ const getMonthlySales = async () => {
   return Object.values(monthly);
 };
 
-const getDashboardStats = async () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+// const getDashboardStats = async () => {
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+//   const tomorrow = new Date(today);
+//   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  // Get start of current month
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+//   // Get start of current month
+//   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  const [todaySales, allProducts, lowStockProducts, monthlySales, periodSales] =
-    await Promise.all([
-      prisma.sale.findMany({
-        where: { date: { gte: today, lt: tomorrow } },
-      }),
-      prisma.product.count(),
-      prisma.product.findMany({
-        where: { stock: { lte: prisma.product.fields?.minStock || 5 } },
-      }),
-      getMonthlySales(),
-      prisma.sale.findMany({
-        where: { date: { gte: monthStart, lt: tomorrow } },
-      }),
-    ]);
+//   const [todaySales, allProducts, lowStockProducts, monthlySales, periodSales] =
+//     await Promise.all([
+//       prisma.sale.findMany({
+//         where: { date: { gte: today, lt: tomorrow } },
+//       }),
+//       prisma.product.count(),
+//       prisma.product.findMany({
+//         where: { stock: { lte: prisma.product.fields?.minStock || 5 } },
+//       }),
+//       getMonthlySales(),
+//       prisma.sale.findMany({
+//         where: { date: { gte: monthStart, lt: tomorrow } },
+//       }),
+//     ]);
 
-  // Get low stock products manually
-  const allProductsList = await prisma.product.findMany();
-  const lowStock = allProductsList.filter((p) => p.stock <= p.minStock);
+//   // Get low stock products manually
+//   const allProductsList = await prisma.product.findMany();
+//   const lowStock = allProductsList.filter((p) => p.stock <= p.minStock);
 
-  const todayTotalSales = todaySales.reduce(
-    (sum, s) => sum + Number(s.total),
-    0,
-  );
-  const todayTotalProfit = todaySales.reduce(
-    (sum, s) => sum + Number(s.profit),
-    0,
-  );
-  const periodTotalProfit = periodSales.reduce(
-    (sum, s) => sum + Number(s.profit),
-    0,
-  );
+//   const todayTotalSales = todaySales.reduce(
+//     (sum, s) => sum + Number(s.total),
+//     0,
+//   );
+//   const todayTotalProfit = todaySales.reduce(
+//     (sum, s) => sum + Number(s.profit),
+//     0,
+//   );
+//   const periodTotalProfit = periodSales.reduce(
+//     (sum, s) => sum + Number(s.profit),
+//     0,
+//   );
+
+//   return {
+//     todaySales: todayTotalSales,
+//     todayProfit: todayTotalProfit,
+//     periodProfit: periodTotalProfit,
+//     totalProducts: allProducts,
+//     lowStockCount: lowStock.length,
+//     lowStockProducts: lowStock,
+//     monthlySales,
+//   };
+// };
+
+const getDashboardStats = async ({ startDate, endDate }) => {
+  const where = {};
+  if (startDate && endDate) {
+    where.date = {
+      gte: new Date(startDate),
+      lte: new Date(endDate),
+    };
+  }
+  const [cards, charts, tables] = await Promise.all([
+    getCards(where),
+    getCartsSalesPerMount(),
+    getLowProduct(),
+  ]);
 
   return {
-    todaySales: todayTotalSales,
-    todayProfit: todayTotalProfit,
-    periodProfit: periodTotalProfit,
-    totalProducts: allProducts,
-    lowStockCount: lowStock.length,
-    lowStockProducts: lowStock,
-    monthlySales,
+    cards,
+    charts,
+    tables,
   };
+};
+
+const getCardsHold = async () => {
+  const data = await getCards();
+
+  return data;
 };
 
 module.exports = {
@@ -173,4 +205,7 @@ module.exports = {
   getRevenueShare,
   getMonthlySales,
   getDashboardStats,
+  getCartsSalesPerMount,
+  getLowProduct,
+  getCardsHold,
 };

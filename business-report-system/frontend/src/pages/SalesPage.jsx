@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect } from "react";
 import api from "../services/api";
 import Modal from "../components/Modal";
-import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
-import { formatCurrency, formatDate } from "../utils/helpers";
+import { formatCurrency } from "../utils/helpers";
 import { Plus, Pencil, Trash2, X, Eye } from "lucide-react";
+import Cards from "../components/Cards";
+import PageHeader from "../components/pageHeader";
 
 export default function SalesPage() {
   const [sales, setSales] = useState([]);
@@ -13,8 +14,12 @@ export default function SalesPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [detailDate, setDetailDate] = useState(null);
+  const [selectedHeader, setSelectedHeader] = useState(null);
   const [editId, setEditId] = useState(null);
+  const [openDeposit, setOpenDeposit] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [totalHold, setCardsHold] = useState(0);
+
   const [form, setForm] = useState({
     date: "",
     items: [],
@@ -23,10 +28,11 @@ export default function SalesPage() {
       quantity: "",
       priceSell: "",
     },
+    cash: "",
+    qris: "",
   });
+
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(1);
-  const perPage = 10;
 
   const fetchSales = () => {
     setLoading(true);
@@ -37,14 +43,24 @@ export default function SalesPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchSales();
-  }, []);
-  useEffect(() => {
+  const fetchProduct = () => {
     api
       .get("/products")
       .then((res) => setProducts(res.data.data))
       .catch(console.error);
+  };
+
+  const fetchDataCards = () => {
+    api
+      .get("/report/get-cards")
+      .then((res) => setCardsHold(res.data.data.realtimeCashHold))
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchSales();
+    fetchProduct();
+    fetchDataCards();
   }, []);
 
   const openCreate = () => {
@@ -77,56 +93,17 @@ export default function SalesPage() {
         quantity: "",
         priceSell: "",
       },
+      cash: "",
+      qris: "",
     });
     setModalOpen(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (form.items.length === 0) {
-      alert("Please add at least one product");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      if (editId) {
-        // For edit: only update first item (backward compatibility)
-        const item = form.items[0];
-        const payload = {
-          productId: Number(item.productId),
-          quantity: Number(item.quantity),
-          priceSell: Number(item.priceSell),
-          date: form.date,
-        };
-        await api.put(`/sales/${editId}`, payload);
-      } else {
-        // For create: submit each item as a separate sale
-        for (const item of form.items) {
-          const payload = {
-            productId: Number(item.productId),
-            quantity: Number(item.quantity),
-            priceSell: Number(item.priceSell),
-            date: form.date,
-          };
-          await api.post("/sales", payload);
-        }
-      }
-      setModalOpen(false);
-      fetchSales();
-    } catch (err) {
-      alert(err.response?.data?.message || "Error saving sale");
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleAddProductToList = () => {
     const { productId, quantity, priceSell } = form.tempItem;
 
     if (!productId || !quantity || !priceSell) {
-      alert("Please fill in all product fields");
+      alert("Silahkan Lengkapi Data Produk Terjual");
       return;
     }
 
@@ -176,173 +153,452 @@ export default function SalesPage() {
     }, 0);
   };
 
+  const formatPaymentType = (type) => {
+    if (!type) return "-";
+    if (type === "Cash;Qris") return "Cash || Qris";
+    return type;
+  };
+
+  const getPaymentBadgeClass = (paymentType) => {
+    if (paymentType === "Cash") return "bg-emerald-100 text-emerald-800";
+    if (paymentType === "Qris") return "bg-yellow-100 text-yellow-800";
+    if (paymentType === "Cash || Qris") return "bg-yellow-100 text-yellow-800";
+    return "bg-gray-100 text-gray-700";
+  };
+
   const handleDelete = async (id) => {
-    if (!confirm("Delete this sale record?")) return;
+    if (!confirm("Yakin Menghapus Data Laporan Penjualan ini?")) return;
     try {
       await api.delete(`/sales/${id}`);
       fetchSales();
+      if (
+        selectedHeader &&
+        selectedHeader.sales?.some((sale) => sale.id === id)
+      ) {
+        setSelectedHeader(null);
+        setDetailModalOpen(false);
+      }
     } catch (err) {
-      alert(err.response?.data?.message || "Error deleting sale");
+      alert(
+        err.response?.data?.message || "Gagal Menghapus Data Laporan Penjualan",
+      );
     }
   };
 
-  // Group sales by date
-  const groupSalesByDate = () => {
-    const grouped = {};
-    sales.forEach((sale) => {
-      const dateKey = new Date(sale.date).toISOString().split("T")[0];
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(sale);
-    });
-    return grouped;
+  const getFilteredSales = () => {
+    let data = sales;
+
+    // Filter tanggal
+    if (dateFilter) {
+      data = data.filter(
+        (sale) =>
+          new Date(sale.date).toISOString().split("T")[0] === dateFilter,
+      );
+    }
+
+    // Mode setor
+    if (openDeposit) {
+      data = data.filter(
+        (sale) => sale.typePayment.includes("Cash") && sale.isDeposit === "N",
+      );
+    }
+
+    return data;
   };
 
-  // Get summary for a specific date
-  const getSaleSummaryForDate = (dateKey) => {
-    const grouped = groupSalesByDate();
-    const salesForDate = grouped[dateKey] || [];
-    const totalQty = salesForDate.reduce((sum, s) => sum + s.quantity, 0);
-    const totalProfit = salesForDate.reduce(
-      (sum, s) => sum + Number(s.profit),
-      0,
-    );
-    const totalSales = salesForDate.reduce(
-      (sum, s) => sum + Number(s.total),
-      0,
-    );
-    return { totalQty, totalProfit, totalSales, sales: salesForDate };
-  };
-
-  // Open detail view for a specific date
-  const openDetailView = (dateKey) => {
-    setDetailDate(dateKey);
+  const openDetailView = (header) => {
+    setSelectedHeader(header);
     setDetailModalOpen(true);
   };
 
-  // Filter grouped sales by date filter
-  const getFilteredGroupedSales = () => {
-    const grouped = groupSalesByDate();
-    if (!dateFilter) return grouped;
+  //HANDLE SAVE SALE & DEPOSIT
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    const filtered = {};
-    if (grouped[dateFilter]) {
-      filtered[dateFilter] = grouped[dateFilter];
+    if (form.items.length === 0) {
+      alert("Pilih Produk Terjual Terlebih Dahulu");
+      return;
     }
-    return filtered;
+
+    // Validation: Cash + QRIS must equal Total Penjualan
+    const totalPenjualan = calculateGrandTotal();
+    const cashAmount = parseFloat(form.cash) || 0;
+    const qrisAmount = parseFloat(form.qris) || 0;
+    const totalPayment = cashAmount + qrisAmount;
+
+    if (Math.abs(totalPayment - totalPenjualan) > 0.01) {
+      alert(
+        `Total pembayaran Cash atau QRIS (${formatCurrency(totalPayment)}) tidak sesuai dengan Total Penjualan/Pendapatan (${formatCurrency(totalPenjualan)}).`,
+      );
+      return;
+    }
+
+    if (!editId) {
+      const dateAlreadyExists = sales.some(
+        (sale) => new Date(sale.date).toISOString().split("T")[0] === form.date,
+      );
+      if (dateAlreadyExists) {
+        alert(
+          "Laporan Penjualan Hari ini Telah di Input. Silahkan hubungi admin untuk edit Apabila terdapat kesalahan Laporan",
+        );
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      if (editId) {
+        // For edit: only update first item (backward compatibility)
+        const item = form.items[0];
+        const payload = {
+          productId: Number(item.productId),
+          quantity: Number(item.quantity),
+          priceSell: Number(item.priceSell),
+          date: form.date,
+          cash: cashAmount,
+          qris: qrisAmount,
+        };
+        await api.put(`/sales/${editId}`, payload);
+      } else {
+        // For create: submit a single payload with a list of items
+        const payload = {
+          Date: form.date,
+          totalPayment: totalPenjualan,
+          TotalQuantity: form.items.reduce(
+            (sum, item) => sum + Number(item.quantity),
+            0,
+          ),
+          cash: cashAmount,
+          qris: qrisAmount,
+          list: form.items.map((item) => ({
+            productid: Number(item.productId),
+            quantity: Number(item.quantity),
+            priceSell: Number(item.priceSell),
+          })),
+        };
+        await api.post("/sales", payload);
+      }
+      setModalOpen(false);
+      fetchSales();
+      fetchProduct();
+    } catch (err) {
+      alert(
+        err.response?.data?.message || "Gagal Menyimpan Data Laporan Penjualan",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const paginated = sales.slice((page - 1) * perPage, page * perPage);
+  const HandleSubmitDeposit = async (e) => {
+    e.preventDefault();
+
+    if (selected === 0) {
+      alert("Silahkan pilih penjualan yang ingin di setorkan");
+      return;
+    }
+
+    if (
+      totalDeposit <= 0 ||
+      !totalDeposit ||
+      typeof totalDeposit !== "number"
+    ) {
+      alert("Error total setoran");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        id: selected,
+        totalDeposit: totalDeposit,
+      };
+      const res = await api.post("/deposit", payload);
+      console.log(payload);
+      fetchSales();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal Menyimpan Data Setoran");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSelectDepo = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const totalDeposit = sales
+    .filter((item) => selected.includes(item.id))
+    .reduce((sum, item) => sum + item.cash, 0);
 
   return (
     <div className="space-y-4">
+      {/* //HEADER */}
+      <PageHeader
+        title="Menu Laporan Penjualan"
+        description="Lihat ringkasan penjualan, analisis transaksi, dan laporan berdasarkan periode."
+      />
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Sales</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-        >
-          <Plus size={16} /> Record Sale
-        </button>
-      </div>
+        <div className="flex justify-between items-center gap-3">
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            <Plus size={16} /> Tambah Laporan Penjualan
+          </button>
+          <button
+            onClick={() => setOpenDeposit(!openDeposit)}
+            className={`
+    inline-flex items-center gap-2 rounded-xl px-4 py-2
+    text-sm font-medium transition-all duration-200
+    ${
+      openDeposit
+        ? "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
+        : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+    }
+  `}
+          >
+            {openDeposit ? "Batal" : "Setor Uang Cash Penjualan"}
+          </button>
+        </div>
 
-      <div className="relative">
-        <input
-          type="date"
-          placeholder="Filter by date..."
-          value={dateFilter}
-          onChange={(e) => {
-            setDateFilter(e.target.value);
-            setPage(1);
-          }}
-          className="w-full sm:w-60 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-sm"
-        />
+        <div className="relative w-full sm:w-auto">
+          <input
+            type="date"
+            placeholder="Filter by date..."
+            value={dateFilter}
+            onChange={(e) => {
+              setDateFilter(e.target.value);
+            }}
+            className="w-full sm:w-60 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-sm"
+          />
+        </div>
       </div>
 
       {loading ? (
         <LoadingSpinner />
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Date
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Total Qty
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-600">
-                    Total Sales
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-600">
-                    Profit
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(getFilteredGroupedSales())
-                  .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
-                  .map(([dateKey, salesForDay]) => {
-                    const summary = getSaleSummaryForDate(dateKey);
-                    return (
-                      <tr
-                        key={dateKey}
-                        className="border-t border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="py-3 px-4 text-gray-600">
-                          {new Date(dateKey).toLocaleDateString("id-ID", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </td>
-                        <td className="py-3 px-4 text-center font-medium text-gray-900">
-                          {summary.totalQty}
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-gray-900">
-                          {formatCurrency(summary.totalSales)}
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-green-600">
-                          {formatCurrency(summary.totalProfit)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => openDetailView(dateKey)}
-                              className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
-                              title="View details"
+        //TABEL RECORD
+
+        <div
+          className={`grid gap-4 ${openDeposit ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1"}`}
+        >
+          {openDeposit && (
+            <div className="order-1 lg:order-2">
+              <div className="sticky top-6 max-h-[77vh] overflow-y-auto bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  {/* Saldo */}
+                  <Cards
+                    variant="saldo"
+                    type="cashHold"
+                    value={formatCurrency(totalHold)}
+                    className="mb-5 h-24 w-full"
+                  />
+
+                  {/* Ringkasan */}
+                  <div className="rounded-xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Total Setoran</p>
+
+                    <h3 className="mt-1 text-2xl font-bold text-gray-900">
+                      {formatCurrency(totalDeposit)}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-gray-500">
+                      Total nominal dari transaksi yang dipilih.
+                    </p>
+                  </div>
+
+                  {/* Action */}
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <button
+                      onClick={HandleSubmitDeposit}
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md"
+                    >
+                      Setorkan
+                    </button>
+
+                    <button
+                      onClick={() => setSelected([])}
+                      className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div
+            className={`order-2 lg:order-1 ${openDeposit ? "col-span-2" : "col-span-1"}`}
+          >
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">
+                        Tanggal
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Total Terjual (Pcs)
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Total Pendapatan
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Total Pendapatan Cash
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Total Pendapatan Qris
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Tipe Pembayaran
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Total Keuntungan
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Setoran
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        status
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">
+                        Actions
+                      </th>
+                      {openDeposit && (
+                        <th className="text-center py-3 px-4 font-medium text-gray-600"></th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getFilteredSales()
+                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                      .map((headersale) => (
+                        <tr
+                          key={headersale.id}
+                          className="border-t border-gray-100 hover:bg-gray-50"
+                        >
+                          <td className="py-3 px-4 text-gray-600">
+                            {/* <td className="px-4 py-3"> */}
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900">
+                                {new Date(headersale.date).toLocaleDateString(
+                                  "id-ID",
+                                  {
+                                    weekday: "long",
+                                  },
+                                )}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {new Date(headersale.date).toLocaleDateString(
+                                  "id-ID",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  },
+                                )}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                            {headersale.allquantity}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                            {formatCurrency(
+                              openDeposit ? headersale.cash : headersale.total,
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                            {formatCurrency(headersale.cashReport || 0)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                            {formatCurrency(headersale.qris || 0)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getPaymentBadgeClass(formatPaymentType(headersale.typePayment))}`}
                             >
-                              <Eye size={15} />
-                            </button>
-                          </div>
+                              {formatPaymentType(
+                                openDeposit ? "Cash" : headersale.typePayment,
+                              )}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-green-600">
+                            {formatCurrency(headersale.profit)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                            {formatCurrency(headersale.cash || 0)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-green-600">
+                            <span
+                              className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                                headersale.isDeposit === "Y" ||
+                                headersale.cash <= 0
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {headersale.isDeposit === "Y" ||
+                              headersale.cash <= 0
+                                ? "Sudah Disetor"
+                                : "Belum Disetor"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => openDetailView(headersale)}
+                                className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
+                                title="View details"
+                              >
+                                <Eye size={15} />
+                              </button>
+                            </div>
+                          </td>
+                          {openDeposit && (
+                            <td className="py-3 px-4 items-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  // checked={headersale.some(
+                                  //   (x) => x.id === headersale.id,
+                                  // )}
+                                  checked={selected.includes(headersale.id)}
+                                  onChange={() =>
+                                    handleSelectDepo(headersale.id)
+                                  }
+                                />
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    {getFilteredSales().length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="py-8 text-center text-gray-400"
+                        >
+                          Tidak ada data Penjualan
                         </td>
                       </tr>
-                    );
-                  })}
-                {Object.keys(getFilteredGroupedSales()).length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-400">
-                      No sales found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
+      {/* //MODAL */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editId ? "Edit Sale" : "Record Sale"}
+        title={editId ? "Edit Laporan Penjualan" : "Tambah Laporan Penjualan"}
       >
         <form
           onSubmit={handleSubmit}
@@ -351,7 +607,7 @@ export default function SalesPage() {
           {/* DATE */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date
+              Tanggal
             </label>
             <input
               type="date"
@@ -365,22 +621,22 @@ export default function SalesPage() {
           {/* PRODUCT FORM INPUT */}
           <div className="border-t pt-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">
-              Add Products
+              Tambah Produk
             </h3>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product
+                Produk
               </label>
               <select
                 value={form.tempItem.productId}
                 onChange={(e) => handleProductChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
               >
-                <option value="">Select product</option>
+                <option value="">Pilih Produk</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} (Stock: {p.stock})
+                    {p.name} (Stok: {p.stock})
                   </option>
                 ))}
               </select>
@@ -389,7 +645,7 @@ export default function SalesPage() {
             <div className="grid grid-cols-3 gap-2 mt-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Qty
+                  Jumlah Terjual
                 </label>
                 <input
                   type="number"
@@ -410,7 +666,7 @@ export default function SalesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price
+                  Harga Jual
                 </label>
                 <input
                   type="number"
@@ -437,7 +693,7 @@ export default function SalesPage() {
                   onClick={handleAddProductToList}
                   className="w-full px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                 >
-                  <Plus size={16} className="inline" /> Add
+                  <Plus size={16} className="inline" />
                 </button>
               </div>
             </div>
@@ -447,7 +703,7 @@ export default function SalesPage() {
           {form.items.length > 0 && (
             <div className="border-t pt-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                Products Added
+                List Produk Terjual
               </h3>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {form.items.map((item, idx) => {
@@ -466,7 +722,7 @@ export default function SalesPage() {
                           {product?.name}
                         </p>
                         <p className="text-gray-600">
-                          {item.quantity} Ã— {formatCurrency(item.priceSell)} ={" "}
+                          {item.quantity} x {formatCurrency(item.priceSell)} ={" "}
                           {formatCurrency(itemTotal)}
                         </p>
                       </div>
@@ -486,11 +742,46 @@ export default function SalesPage() {
               <div className="mt-3 pt-3 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-900">
-                    Total Penjualan:
+                    Total Pendapatan:
                   </span>
                   <span className="text-lg font-bold text-red-600">
                     {formatCurrency(calculateGrandTotal())}
                   </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PAYMENT INPUTS */}
+          {form.items.length > 0 && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                Pembayaran
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Uang Cash
+                  </label>
+                  <input
+                    type="number"
+                    value={form.cash}
+                    onChange={(e) => setForm({ ...form, cash: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    QRIS
+                  </label>
+                  <input
+                    type="number"
+                    value={form.qris}
+                    onChange={(e) => setForm({ ...form, qris: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  />
                 </div>
               </div>
             </div>
@@ -503,14 +794,14 @@ export default function SalesPage() {
               onClick={() => setModalOpen(false)}
               className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
-              Cancel
+              Batal
             </button>
             <button
               type="submit"
               disabled={saving || form.items.length === 0}
               className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Saving..." : "Simpan"}
             </button>
           </div>
         </form>
@@ -519,37 +810,40 @@ export default function SalesPage() {
       {/* DETAIL MODAL - Show all sales for a specific date */}
       <Modal
         isOpen={detailModalOpen}
-        onClose={() => setDetailModalOpen(false)}
-        title={`Sales Detail - ${detailDate ? new Date(detailDate).toLocaleDateString("id-ID", { weekday: "short", year: "numeric", month: "short", day: "numeric" }) : ""}`}
+        onClose={() => {
+          setSelectedHeader(null);
+          setDetailModalOpen(false);
+        }}
+        title={`Laporan Detail - ${selectedHeader ? new Date(selectedHeader.date).toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : ""}`}
       >
-        {detailDate && (
+        {selectedHeader && (
           <div className="space-y-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left py-2 px-3 font-medium text-gray-600">
-                      Product
+                      Produk
                     </th>
                     <th className="text-center py-2 px-3 font-medium text-gray-600">
-                      Qty
+                      Jumlah Terjual (Pcs)
                     </th>
                     <th className="text-right py-2 px-3 font-medium text-gray-600">
-                      Price
+                      Harga Jual
                     </th>
                     <th className="text-right py-2 px-3 font-medium text-gray-600">
-                      Total
+                      Total Pendapatan
                     </th>
                     <th className="text-right py-2 px-3 font-medium text-gray-600">
-                      Profit
+                      Total Keuntungan
                     </th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-600">
-                      Actions
-                    </th>
+                    {/* <th className="text-center py-2 px-3 font-medium text-gray-600">
+                      Aksi
+                    </th> */}
                   </tr>
                 </thead>
                 <tbody>
-                  {getSaleSummaryForDate(detailDate).sales.map((s) => (
+                  {selectedHeader.sales.map((s) => (
                     <tr
                       key={s.id}
                       className="border-t border-gray-100 hover:bg-gray-50"
@@ -568,7 +862,7 @@ export default function SalesPage() {
                         {formatCurrency(s.profit)}
                       </td>
                       <td className="py-2 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
+                        {/* <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => {
                               setDetailModalOpen(false);
@@ -589,7 +883,7 @@ export default function SalesPage() {
                           >
                             <Trash2 size={14} />
                           </button>
-                        </div>
+                        </div> */}
                       </td>
                     </tr>
                   ))}
@@ -600,33 +894,46 @@ export default function SalesPage() {
             {/* Summary Section */}
             <div className="border-t pt-4 mt-4 space-y-2">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Total Quantity:</span>
+                <span className="text-gray-600">Total Terjual (Pcs):</span>
                 <span className="font-semibold text-gray-900">
-                  {getSaleSummaryForDate(detailDate).totalQty}
+                  {selectedHeader.allquantity}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Total Sales:</span>
+                <span className="text-gray-600">Total Pendapatan:</span>
                 <span className="font-semibold text-gray-900">
-                  {formatCurrency(getSaleSummaryForDate(detailDate).totalSales)}
+                  {formatCurrency(selectedHeader.total)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Total Uang Cash:</span>
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(selectedHeader.cash)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Total QRIS:</span>
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(selectedHeader.qris)}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm font-semibold">
-                <span className="text-gray-600">Total Profit:</span>
+                <span className="text-gray-600">Total Keuntungan:</span>
                 <span className="text-lg text-green-600">
-                  {formatCurrency(
-                    getSaleSummaryForDate(detailDate).totalProfit,
-                  )}
+                  {formatCurrency(selectedHeader.profit)}
                 </span>
               </div>
             </div>
 
             <div className="flex justify-end pt-4 border-t">
               <button
-                onClick={() => setDetailModalOpen(false)}
+                onClick={() => {
+                  setSelectedHeader(null);
+                  setDetailModalOpen(false);
+                }}
                 className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
-                Close
+                Tutup
               </button>
             </div>
           </div>

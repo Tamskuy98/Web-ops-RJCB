@@ -4,20 +4,24 @@ import Modal from "../components/Modal";
 import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatDate, formatCurrency } from "../utils/helpers";
-import { Plus, Trash2, Eye, X } from "lucide-react";
+import { Plus, Trash2, X, Eye } from "lucide-react";
+import PageHeader from "../components/pageHeader";
 import Cards from "../components/Cards";
+
+// ========================================
+// HELPER REALTIME CARDS
+// ========================================
 
 const defaultFormState = {
   date: "",
   supplier: "",
   items: [],
   newItem: {
-    productid: "",
-    name: "",
+    name: "gas",
     qty: "",
-    priceCost: "",
     price: "",
   },
+  otherItemName: "",
   attachmentType: "foto",
   attachmentFile: null,
   attachmentUrl: "",
@@ -25,7 +29,6 @@ const defaultFormState = {
   paymentCashHold: "",
   paymentQris: "",
   note: "",
-  category: "RESTOCK",
 };
 
 const paymentColor = {
@@ -39,7 +42,10 @@ const paymentColor = {
 // ========================================
 
 const calculateTotalPayment = (items) => {
-  return items.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  return items.reduce(
+    (sum, item) => sum + Number(item.qty) * Number(item.price),
+    0,
+  );
 };
 
 const calculateTotalPaid = (cashOnHand, cashHold, qris) => {
@@ -48,10 +54,10 @@ const calculateTotalPaid = (cashOnHand, cashHold, qris) => {
 
 const calculateTypePayment = (cashOnHand, cashHold, qris) => {
   const types = [];
+  if (Number(qris || 0) > 0) types.push("QRIS");
   if (Number(cashOnHand || 0) > 0) types.push("CASH ON HAND");
   if (Number(cashHold || 0) > 0) types.push("CASH HOLD");
-  if (Number(qris || 0) > 0) types.push("QRIS");
-  return types.length > 0 ? types.join(";") : "";
+  return types.length > 0 ? types.join(";") : "none";
 };
 
 const calculateStatus = (totalPayment, totalPaid) => {
@@ -64,6 +70,10 @@ const calculateOutstandingPay = (totalPayment, totalPaid) => {
 
 const calculateAllQty = (items) => {
   return items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+};
+
+const calculateItemTotal = (item) => {
+  return Number(item.qty || 0) * Number(item.price || 0);
 };
 
 const formatTypePayment = (cashOnHand, cashHold, qris) => {
@@ -93,6 +103,17 @@ const validateForm = (form, totalPayment, totalPaid) => {
     errors.push("Minimal tambah 1 item");
   }
 
+  if (!form.attachmentType) {
+    errors.push("Tipe lampiran harus dipilih");
+  } else {
+    if (form.attachmentType === "foto" && !form.attachmentFile) {
+      errors.push("File foto harus diupload");
+    }
+    if (form.attachmentType === "file" && !form.attachmentUrl?.trim()) {
+      errors.push("URL lampiran harus diisi");
+    }
+  }
+
   if (totalPaid > totalPayment) {
     errors.push("Total Dibayar tidak boleh lebih besar dari Total Belanja");
   }
@@ -103,57 +124,19 @@ const validateForm = (form, totalPayment, totalPaid) => {
 // ========================================
 // MAIN COMPONENT
 // ========================================
-
-export default function RestockPage() {
-  const [products, setProducts] = useState([]);
-  const [restocks, setRestocks] = useState([]);
+export default function OperationalPage() {
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [selectedRestock, setSelectedRestock] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [form, setForm] = useState(defaultFormState);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [validationErrors, setValidationErrors] = useState([]);
   const perPage = 10;
+  const [selectedHeader, setSelectedHeader] = useState(null);
   const [valueCards, setCards] = useState(0);
 
-  // ---- FETCH DATA ----
-  const fetchRestocks = () => {
-    setLoading(true);
-    Promise.all([api.get("/restock"), api.get("/products")])
-      .then(([resStock, resProduct]) => {
-        setRestocks(resStock.data.data);
-        setProducts(resProduct.data.data);
-      })
-      .catch((err) => {
-        console.error("Fetch error:", err);
-        alert("Gagal mengambil data");
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchRestocks();
-    fetchDataCards();
-  }, []);
-
-  const paginated = restocks.slice((page - 1) * perPage, page * perPage);
-
-  // ---- HANDLE CALCULATIONS ----
-  const totalPayment = Number(calculateTotalPayment(form.items));
-  // console.log(totalPayment);
-  const cashOnHand = Number(form.paymentCashOnHand || 0);
-  const cashHold = Number(form.paymentCashHold || 0);
-  const qris = Number(form.paymentQris || 0);
-  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris);
-  const typePayment = calculateTypePayment(cashOnHand, cashHold, qris);
-  const typePaymentFormatted = formatTypePayment(cashOnHand, cashHold, qris);
-  const status = calculateStatus(totalPayment, totalPaid);
-  const outstandingPay = calculateOutstandingPay(totalPayment, totalPaid);
-  const allQty = calculateAllQty(form.items);
-
-  // ---- CHECK AND BALANCE SALDO ----
   const realtimeCards = [
     {
       type: "cashHand",
@@ -178,17 +161,6 @@ export default function RestockPage() {
 
   const emptyBalance = Object.values(readOnlyMap).every(Boolean);
 
-  const allPayment = {
-    cashHand: cashOnHand,
-    cashHold: cashHold,
-    qris: qris,
-  };
-
-  const insufficientBalance = realtimeCards.find((card) => {
-    const payment = allPayment[card.type] ?? 0;
-    return payment > card.amount;
-  });
-
   const inputClass = (readOnly) =>
     `w-full rounded-xl border px-3 py-2.5 text-sm transition-all outline-none ${
       readOnly
@@ -196,12 +168,32 @@ export default function RestockPage() {
         : "border-gray-300 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-100"
     }`;
 
+  // ---- FETCH DATA ----
+  const fetchItems = () => {
+    setLoading(true);
+    api
+      .get("/operational")
+      .then((res) => setItems(res.data.data))
+      .catch((err) => {
+        console.error("Fetch error:", err);
+        alert("Gagal mengambil data");
+      })
+      .finally(() => setLoading(false));
+  };
+
   const fetchDataCards = () => {
     api
       .get("/report/get-cards")
       .then((res) => setCards(res.data.data))
       .catch(console.error);
   };
+
+  console.log(valueCards);
+
+  useEffect(() => {
+    fetchItems();
+    fetchDataCards();
+  }, []);
 
   // ---- MODAL HANDLERS ----
   const openCreate = () => {
@@ -219,48 +211,41 @@ export default function RestockPage() {
     setForm(defaultFormState);
   };
 
-  const openView = (restock) => {
-    setSelectedRestock(restock);
-    setViewModalOpen(true);
-  };
+  // ---- CALCULATIONS ----
+  const totalPayment = calculateTotalPayment(form.items);
+  const cashOnHand = Number(form.paymentCashOnHand || 0);
+  const cashHold = Number(form.paymentCashHold || 0);
+  const qris = Number(form.paymentQris || 0);
+  const totalPaid = calculateTotalPaid(cashOnHand, cashHold, qris) || 0;
+  const typePayment = calculateTypePayment(cashOnHand, cashHold, qris);
+  const typePaymentFormatted = formatTypePayment(cashOnHand, cashHold, qris);
+  const status = calculateStatus(totalPayment, totalPaid);
+  const outstandingPay = calculateOutstandingPay(totalPayment, totalPaid);
+  const allQty = calculateAllQty(form.items);
 
   // ---- ITEM MANAGEMENT ----
   const handleNewItemChange = (field, value) => {
-    let newItem = {
-      ...form.newItem,
-      [field]: value,
-    };
-
-    if (field === "productid") {
-      const product = products.find((p) => p.id === Number(value));
-      newItem.name = product ? product.name : "";
-      newItem.qty = "";
-      newItem.priceCost = product ? product.priceCost : "";
-      newItem.price = "";
-    }
-
-    if (field === "qty" && form.newItem.priceCost) {
-      newItem.price = Number(form.newItem.priceCost) * Number(value);
-    }
-
     setForm({
       ...form,
-      newItem,
+      newItem: {
+        ...form.newItem,
+        [field]: value,
+      },
     });
   };
 
   const addItem = () => {
-    const { productid, name, qty, price, priceCost } = form.newItem;
+    const { name, qty, price } = form.newItem;
 
     const itemErrors = [];
-    if (!productid) {
-      itemErrors.push("Produk harus dipilih");
-    }
     if (!qty || Number(qty) <= 0) {
       itemErrors.push("Jumlah barang harus lebih dari 0");
     }
     if (!price || Number(price) <= 0) {
       itemErrors.push("Harga barang harus lebih dari 0");
+    }
+    if (name === "lainnya" && !form.otherItemName?.trim()) {
+      itemErrors.push("Kategori lainnya harus diisi");
     }
 
     if (itemErrors.length > 0) {
@@ -268,26 +253,28 @@ export default function RestockPage() {
       return;
     }
 
+    const itemName =
+      name === "lainnya"
+        ? form.otherItemName.trim()
+        : name.charAt(0).toUpperCase() + name.slice(1);
+
     setValidationErrors([]);
     setForm({
       ...form,
       items: [
         ...form.items,
         {
-          productid: Number(productid),
-          name: name,
+          name: itemName,
           qty: Number(qty),
-          priceCost: Number(priceCost),
           price: Number(price),
         },
       ],
       newItem: {
-        productid: "",
-        name: "",
+        name: "gas",
         qty: "",
-        priceCost: "",
         price: "",
       },
+      otherItemName: "",
     });
   };
 
@@ -323,10 +310,6 @@ export default function RestockPage() {
       return;
     }
 
-    if (insufficientBalance) {
-      return alert("Input pembayaran melebihi saldo yang tersedia");
-    }
-
     setSaving(true);
     setValidationErrors([]);
 
@@ -337,17 +320,15 @@ export default function RestockPage() {
       payload.append("date", new Date(form.date).toISOString());
       payload.append("supplier", form.supplier.trim());
       payload.append("note", form.note?.trim() || "");
-      payload.append("category", form.category);
+      payload.append("category", "Operational");
 
       // Attachment
       payload.append("attachmentType", form.attachmentType);
-      payload.append("attachment", form.attachmentFile);
-
-      // if (form.attachmentType === "foto" && form.attachmentFile) {
-      //   payload.append("attachment", form.attachmentFile);
-      // } else if (form.attachmentType === "url") {
-      //   payload.append("attachment", form.attachmentUrl.trim());
-      // }
+      if (form.attachmentType === "foto" && form.attachmentFile) {
+        payload.append("attachment", form.attachmentFile);
+      } else if (form.attachmentType === "file") {
+        payload.append("attachment", form.attachmentUrl.trim());
+      }
 
       // Payment info
       payload.append("cashOnHand", cashOnHand);
@@ -356,7 +337,7 @@ export default function RestockPage() {
       payload.append("totalPayment", totalPayment);
       payload.append(
         "typePayment",
-        typePayment === "" ? "DIBAYAR DENGAN HUTANG" : typePayment,
+        typePayment === "none" ? "DIBAYAR DENGAN HUTANG" : typePayment,
       );
       payload.append("status", status);
       payload.append("outstandingPay", outstandingPay);
@@ -364,21 +345,23 @@ export default function RestockPage() {
 
       // Items
       form.items.forEach((item, idx) => {
-        payload.append(`items[${idx}][productid]`, Number(item.productid));
         payload.append(`items[${idx}][name]`, item.name);
-        payload.append(`items[${idx}][qty]`, Number(item.qty));
-        payload.append(`items[${idx}][price]`, Number(item.price));
+        payload.append(`items[${idx}][qty]`, item.qty);
+        payload.append(`items[${idx}][price]`, item.price);
+        payload.append(`items[${idx}][totalPrice]`, calculateItemTotal(item));
       });
-      console.log(Object.fromEntries(payload.entries()));
-      await api.post("/restock", payload, {
+
+      console.log([...payload.entries()]);
+
+      await api.post("/operational", payload, {
         // headers: {
         //   "Content-Type": "multipart/form-data",
         // },
       });
 
       closeModal();
-      fetchRestocks();
-      alert("Data restock berhasil disimpan");
+      fetchItems();
+      alert("Data operational berhasil disimpan");
     } catch (err) {
       console.error("Submit error:", err);
       const errorMessage =
@@ -389,13 +372,22 @@ export default function RestockPage() {
     }
   };
 
+  // ---- VIEW DETAIL HANDLER ----
+  const openDetailView = (item) => {
+    // console.log(item);
+    setSelectedHeader(item);
+    // console.log(selectedHeader);
+    // console.log(selectedHeader?.opsdetail);
+    setDetailModalOpen(true);
+  };
+
   // ---- DELETE HANDLER ----
   const handleDelete = async (id) => {
-    if (!confirm("Hapus data restock ini?")) return;
+    if (!confirm("Hapus data operational ini?")) return;
 
     try {
-      await api.delete(`/restock/${id}`);
-      fetchRestocks();
+      await api.delete(`/operational/${id}`);
+      fetchItems();
       alert("Data berhasil dihapus");
     } catch (err) {
       console.error("Delete error:", err);
@@ -403,11 +395,16 @@ export default function RestockPage() {
     }
   };
 
+  const paginated = items.slice((page - 1) * perPage, page * perPage);
+
   return (
     <div className="space-y-4">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Restock Produk</h1>
+        <PageHeader
+          title="Menu Laporan Belanja Operasional"
+          description="Pantau pengeluaran operasional, analisis transaksi, dan laporan belanja berdasarkan periode."
+        />
         <button
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
@@ -428,22 +425,16 @@ export default function RestockPage() {
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
                     Tanggal
                   </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Item
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Qty
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">
+                    Supplier
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
                     Total Belanja
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Supplier
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
                     Tipe Bayar
                   </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">
                     Status
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">
@@ -463,16 +454,10 @@ export default function RestockPage() {
                     <td className="py-3 px-4 text-gray-600">
                       {formatDate(item.date)}
                     </td>
-                    <td className="py-3 px-4 text-center">
-                      {item.restockDetail?.length || 0}
-                    </td>
-                    <td className="py-3 px-4 text-center font-medium">
-                      {item.allQty}
-                    </td>
+                    <td className="py-3 px-4 text-gray-700">{item.supplier}</td>
                     <td className="py-3 px-4 text-left font-medium text-gray-900">
                       {formatCurrency(item.totalPayment || 0)}
                     </td>
-                    <td className="py-3 px-4 text-gray-700">{item.supplier}</td>
                     <td className="py-3 px-4 text-left font-small">
                       {item.typePayment ? (
                         <div className="flex flex-wrap gap-2">
@@ -493,41 +478,40 @@ export default function RestockPage() {
                       )}
                     </td>
 
-                    <td className="py-3 px-4 text-gray-600 text-center">
+                    <td className="py-3 px-4 text-gray-600">
                       <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          item?.debt?.[0]?.status === "HUTANG"
-                            ? "bg-red-500 text-white"
+                        className={`inline-block rounded px-2 py-1 text-xs font-medium ${
+                          item?.debt?.[0]?.status
+                            ?.toUpperCase()
+                            .includes("HUTANG")
+                            ? "bg-red-100 text-red-700"
                             : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {item?.debt?.[0]?.status || "LUNAS "}
+                        {(item?.debt?.[0]?.status ?? "LUNAS").toUpperCase()}
                       </span>
                     </td>
 
                     <td className="py-3 px-4 text-left text-red-900">
-                      {formatCurrency(item?.debt?.[0]?.outstandingPay || 0)}
+                      {formatCurrency(item.debt?.[0]?.outstandingPay || 0)}
                     </td>
 
-                    <td className="py-3 px-4 text-center space-x-2 flex items-center justify-center">
-                      <button
-                        onClick={() => openView(item)}
-                        className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => openDetailView(item)}
+                          className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
+                          title="View details"
+                        >
+                          <Eye size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {paginated.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-400">
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
                       Tidak ada data
                     </td>
                   </tr>
@@ -537,7 +521,7 @@ export default function RestockPage() {
           </div>
           <div className="px-4 pb-3">
             <Pagination
-              totalItems={restocks.length}
+              totalItems={items.length}
               itemsPerPage={perPage}
               currentPage={page}
               onPageChange={setPage}
@@ -546,16 +530,9 @@ export default function RestockPage() {
         </div>
       )}
 
-      {/* CREATE MODAL */}
-      <Modal
-        isOpen={modalOpen}
-        onClose={closeModal}
-        title="Tambah Restock Produk"
-      >
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 max-h-[80vh] overflow-y-auto"
-        >
+      {/* MODAL */}
+      <Modal isOpen={modalOpen} onClose={closeModal} title="Tambah Operasional">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* VALIDATION ERRORS */}
           {validationErrors.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -573,64 +550,73 @@ export default function RestockPage() {
           )}
 
           {/* BASIC INFO */}
-          <div className="border-b pb-4">
-            <h3 className="font-semibold text-gray-900 mb-3">
-              Informasi Dasar
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tanggal *
-                </label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Supplier *
-                </label>
-                <input
-                  type="text"
-                  value={form.supplier}
-                  onChange={(e) =>
-                    setForm({ ...form, supplier: e.target.value })
-                  }
-                  placeholder="Nama supplier"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                  required
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tanggal *
+              </label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Supplier *
+              </label>
+              <input
+                type="text"
+                value={form.supplier}
+                onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                placeholder="Nama supplier"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                required
+              />
             </div>
           </div>
 
           {/* ITEMS SECTION */}
-          <div className="border-b pb-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Tambah Item</h3>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Tambah Item</h3>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nama Produk *
+                  Nama Barang
                 </label>
                 <select
-                  value={form.newItem.productid}
-                  onChange={(e) =>
-                    handleNewItemChange("productid", e.target.value)
-                  }
+                  value={form.newItem.name}
+                  onChange={(e) => handleNewItemChange("name", e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                 >
-                  <option value="">Pilih Produk</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
+                  <option value="gas">Gas</option>
+                  <option value="minyak">Minyak</option>
+                  <option value="token_listrik">Token Listrik</option>
+                  <option value="plastik_bungkus">Plastik Bungkus</option>
+                  <option value="kertas_bungkus">Kertas Bungkus</option>
+                  <option value="saus">Saus</option>
+                  <option value="lainnya">Lainnya</option>
                 </select>
+
+                {form.newItem.name === "lainnya" && (
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Kategori Lainnya
+                    </label>
+                    <input
+                      type="text"
+                      value={form.otherItemName}
+                      onChange={(e) =>
+                        setForm({ ...form, otherItemName: e.target.value })
+                      }
+                      placeholder="Sebutkan kategori lainnya"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -656,40 +642,44 @@ export default function RestockPage() {
                     min="0"
                     step="0.01"
                     value={form.newItem.price}
-                    readOnly
+                    onChange={(e) =>
+                      handleNewItemChange("price", e.target.value)
+                    }
                     placeholder="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                   />
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={addItem}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <Plus size={14} /> Tambah Item
-              </button>
+              <div className="flex justify-end md:col-span-2">
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <Plus size={14} /> Tambah Item
+                </button>
+              </div>
             </div>
 
             {/* ITEMS LIST */}
             {form.items.length > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                 <div className="text-sm font-semibold text-gray-700 mb-3">
-                  Daftar Item ({form.items.length})
+                  Daftar Belanja ({form.items.length})
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-white">
                       <tr>
                         <th className="text-left py-2 px-3 text-gray-600">
-                          Nama Produk
+                          Barang
                         </th>
                         <th className="text-right py-2 px-3 text-gray-600">
-                          Qty
+                          Jumlah
                         </th>
                         <th className="text-right py-2 px-3 text-gray-600">
-                          Harga Satuan
+                          Harga
                         </th>
                         <th className="text-right py-2 px-3 text-gray-600">
                           Total
@@ -702,20 +692,20 @@ export default function RestockPage() {
                     <tbody>
                       {form.items.map((item, index) => (
                         <tr
-                          key={`${item.productid}-${index}`}
+                          key={`${item.name}-${index}`}
                           className="border-t border-gray-200"
                         >
                           <td className="py-2 px-3 text-gray-700">
                             {item.name}
                           </td>
-                          <td className="py-2 px-3 text-right text-gray-700">
+                          <td className="py-2 px-3 text-center text-gray-700">
                             {item.qty}
                           </td>
                           <td className="py-2 px-3 text-right text-gray-700">
-                            {formatCurrency(item.priceCost)}
+                            {formatCurrency(item.price)}
                           </td>
                           <td className="py-2 px-3 text-right font-medium text-gray-900">
-                            {formatCurrency(item.price)}
+                            {formatCurrency(calculateItemTotal(item))}
                           </td>
                           <td className="py-2 px-3 text-center">
                             <button
@@ -736,8 +726,8 @@ export default function RestockPage() {
           </div>
 
           {/* ATTACHMENT */}
-          {/* <div className="border-b pb-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Lampiran</h3>
+          <div className="space-y-3 border-t pt-3">
+            <h3 className="text-sm font-semibold text-gray-700">Lampiran</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -766,8 +756,8 @@ export default function RestockPage() {
                     <input
                       type="radio"
                       name="attachmentType"
-                      value="url"
-                      checked={form.attachmentType === "url"}
+                      value="file"
+                      checked={form.attachmentType === "file"}
                       onChange={(e) =>
                         setForm({
                           ...form,
@@ -817,7 +807,7 @@ export default function RestockPage() {
                 )}
               </div>
             </div>
-          </div> */}
+          </div>
 
           {/* CARDS */}
           <div className="space-y-3 border-t pt-3">
@@ -838,8 +828,16 @@ export default function RestockPage() {
           </div>
 
           {/* PAYMENT */}
-          <div className="border-b pb-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Pembayaran</h3>
+          <div className="space-y-4 border-t border-gray-200 pt-5">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Pembayaran
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Masukkan nominal pembayaran sesuai saldo operasional yang
+                tersedia.
+              </p>
+            </div>
 
             {emptyBalance && (
               <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -956,95 +954,100 @@ export default function RestockPage() {
           </div>
 
           {/* TOTALS & SUMMARY */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex items-center justify-between">
               <div>
-                <span className="text-gray-600">Total Belanja:</span>
-                <div className="font-semibold text-lg text-gray-900">
-                  {formatCurrency(totalPayment)}
-                </div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Ringkasan Pembayaran
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Informasi total pembayaran dan status transaksi.
+                </p>
               </div>
-              <div>
-                <span className="text-gray-600">Total Dibayar:</span>
-                <div className="font-semibold text-lg text-gray-900">
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  status === "LUNAS"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {status}
+              </span>
+            </div>
+
+            {/* Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Total Belanja</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {formatCurrency(totalPayment)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Total Dibayar</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
                   {formatCurrency(totalPaid)}
-                </div>
+                </p>
               </div>
             </div>
 
-            <div className="pt-2 space-y-1 text-sm border-t border-blue-200">
-              <div>
-                <span className="text-gray-600">Status: </span>
+            {/* Detail */}
+            <div className="mt-5 space-y-4 border-t border-slate-200 pt-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Sisa Hutang</span>
+
                 <span
-                  className={`font-semibold ${
-                    status === "LUNAS" ? "text-green-600" : "text-yellow-600"
+                  className={`text-lg font-bold ${
+                    outstandingPay > 0 ? "text-red-600" : "text-green-600"
                   }`}
                 >
-                  {status}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Sisa Hutang: </span>
-                <span className="font-semibold text-gray-900">
                   {formatCurrency(outstandingPay)}
                 </span>
               </div>
-              <div>
-                <span className="text-gray-600">Tipe Bayar: </span>
-                <span className="font-semibold text-gray-900">
-                  {typePaymentFormatted ? (
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {typePaymentFormatted.split(";").map((payment, index) => (
-                        <span
-                          key={index}
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            paymentColor[payment]
-                          }`}
-                        >
-                          {payment}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    "-"
-                  )}
+
+              <div className="flex items-start justify-between gap-4">
+                <span className="pt-1 text-sm text-slate-500 whitespace-nowrap">
+                  Tipe Pembayaran
                 </span>
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  {emptyBalance ? (
+                    <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                      DIBAYAR DENGAN HUTANG
+                    </span>
+                  ) : typePaymentFormatted ? (
+                    typePaymentFormatted.split(";").map((payment, index) => (
+                      <span
+                        key={index}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          paymentColor[payment]
+                        }`}
+                      >
+                        {payment}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-slate-400">-</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* CATEGORY & NOTE */}
-          <div className="border-b pb-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <select
-                  value={form.category}
-                  onChange={(e) =>
-                    setForm({ ...form, category: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                >
-                  <option value="RESTOCK">RESTOCK</option>
-                  <option value="OTHER">OTHER</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Catatan (opsional)
-              </label>
-              <textarea
-                value={form.note}
-                onChange={(e) => setForm({ ...form, note: e.target.value })}
-                rows={3}
-                placeholder="Tambahkan catatan jika ada..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
-              />
-            </div>
+          {/* NOTE */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Catatan (opsional)
+            </label>
+            <textarea
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+              rows={3}
+              placeholder="Tambahkan catatan jika ada..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+            />
           </div>
 
           {/* BUTTONS */}
@@ -1058,7 +1061,7 @@ export default function RestockPage() {
             </button>
             <button
               type="submit"
-              disabled={saving || form.items.length === 0}
+              disabled={saving}
               className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? "Menyimpan..." : "Simpan"}
@@ -1067,177 +1070,152 @@ export default function RestockPage() {
         </form>
       </Modal>
 
-      {/* VIEW DETAIL MODAL */}
+      {/* MODAL VIEW DETAIL */}
       <Modal
-        isOpen={viewModalOpen}
-        onClose={() => setViewModalOpen(false)}
-        title="Detail Restock"
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setSelectedHeader(null);
+          setDetailModalOpen(false);
+        }}
+        title={`Laporan Detail - ${selectedHeader ? new Date(selectedHeader.date).toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : ""}`}
       >
-        {selectedRestock && (
-          <div className="space-y-4 max-h-[80vh] overflow-y-auto">
-            {/* BASIC INFO */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Informasi Dasar
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-600">Supplier</p>
-                  <p className="font-medium text-gray-900">
-                    {selectedRestock.supplier}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Date</p>
-                  <p className="font-medium text-gray-900">
-                    {formatDate(selectedRestock.date)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Category</p>
-                  <p className="font-medium text-gray-900">
-                    {selectedRestock.category}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Status</p>
-                  <p
-                    className={`font-medium ${
-                      selectedRestock.status === "LUNAS"
-                        ? "text-green-600"
-                        : "text-yellow-600"
-                    }`}
-                  >
-                    {selectedRestock.status}
-                  </p>
-                </div>
-              </div>
-              {selectedRestock.note && (
-                <div className="mt-3">
-                  <p className="text-gray-600 text-sm">Note</p>
-                  <p className="text-gray-900">{selectedRestock.note}</p>
-                </div>
-              )}
+        {selectedHeader && (
+          // <div>
+          //   {selectedHeader?.opsdetail?.map((item) => (
+          //     <div key={item.id}>
+          //       <p>{item.name}</p>
+          //       <p>{item.qty}</p>
+          //       <p>{item.price}</p>
+          //       <p>{item.totalPrice}</p>
+          //     </div>
+          //   ))}
+          // </div>
+          <div className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">
+                      Nama Barang
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-gray-600">
+                      Jumlah Barang
+                    </th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600">
+                      Harga Per Barang
+                    </th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600">
+                      Total Harga Barang
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedHeader?.opsdetail?.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-gray-100 hover:bg-gray-50"
+                    >
+                      <td className="py-2 px-3 font-medium text-gray-900">
+                        {item.name}
+                      </td>
+                      <td className="py-2 px-3 text-center">{item.qty}</td>
+                      <td className="py-2 px-3 text-right text-gray-600">
+                        {formatCurrency(item.price)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-gray-600">
+                        {formatCurrency(item.totalPrice)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* ITEMS */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Items ({selectedRestock.restockDetail?.length || 0})
+            {/* Summary Section */}
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-base font-semibold text-gray-900">
+                Ringkasan Pembayaran
               </h3>
-              <div className="space-y-2">
-                {selectedRestock.restockDetail?.map((detail, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-start mb-1">
-                      <p className="font-medium text-gray-900">{detail.name}</p>
-                      <p className="font-medium text-gray-900">
-                        {formatCurrency(detail.price)}
-                      </p>
-                    </div>
-                    <p className="text-sm text-gray-600">Qty: {detail.qty}</p>
-                    <p className="text-sm text-gray-600">
-                      Subtotal: {formatCurrency(detail.qty * detail.price)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* PAYMENT INFO */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Informasi Pembayaran
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Qty</span>
-                  <span className="font-medium text-gray-900">
-                    {selectedRestock.allQty}
+              <div className="space-y-3">
+                <div className="flex justify-between border-b pb-3">
+                  <span className="text-gray-500">Total Belanja</span>
+                  <span className="font-semibold">
+                    {formatCurrency(selectedHeader.totalPayment)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Belanja</span>
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(selectedRestock.totalPayment)}
-                  </span>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium text-gray-700">
+                    Pembayaran
+                  </p>
+
+                  <div className="space-y-2">
+                    {selectedHeader.cashOnHand > 0 && (
+                      <div className="flex justify-between rounded-lg bg-green-50 px-3 py-2">
+                        <span className="text-green-700">💵 Cash On Hand</span>
+                        <span className="font-semibold text-green-700">
+                          {formatCurrency(selectedHeader.cashOnHand)}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedHeader.cashHold > 0 && (
+                      <div className="flex justify-between rounded-lg bg-yellow-50 px-3 py-2">
+                        <span className="text-yellow-700">🟡 Cash Hold</span>
+                        <span className="font-semibold text-yellow-700">
+                          {formatCurrency(selectedHeader.cashHold)}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedHeader.qris > 0 && (
+                      <div className="flex justify-between rounded-lg bg-blue-50 px-3 py-2">
+                        <span className="text-blue-700">📱 QRIS</span>
+                        <span className="font-semibold text-blue-700">
+                          {formatCurrency(selectedHeader.qris)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="border-t pt-2 mt-2">
+
+                <div className="border-t pt-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Cash On Hand</span>
-                    <span className="font-medium text-gray-900">
-                      {formatCurrency(selectedRestock.cashOnHand)}
+                    <span className="text-gray-500">Status Hutang</span>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        selectedHeader.debt?.[0]?.status === "LUNAS"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {selectedHeader.debt?.[0]?.status ?? "-"}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Cash Hold</span>
-                    <span className="font-medium text-gray-900">
-                      {formatCurrency(selectedRestock.cashHold)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">QRIS</span>
-                    <span className="font-medium text-gray-900">
-                      {formatCurrency(selectedRestock.qris)}
-                    </span>
-                  </div>
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Sisa Hutang</span>
-                      <span className="font-bold text-red-600">
-                        {formatCurrency(selectedRestock.outstandingPay)}
+
+                  {selectedHeader.debt?.[0]?.outstandingPay > 0 && (
+                    <div className="mt-3 flex justify-between">
+                      <span className="text-gray-500">Sisa Hutang</span>
+                      <span className="font-semibold text-red-600">
+                        {formatCurrency(selectedHeader.debt[0].outstandingPay)}
                       </span>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* ATTACHMENT */}
-            {selectedRestock.attachment && (
-              <div className="border-b pb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Attachment</h3>
-                <p className="text-sm text-gray-600 mb-1">
-                  Type: {selectedRestock.attachmentType}
-                </p>
-                <p className="text-sm text-gray-900 break-all">
-                  {selectedRestock.attachment}
-                </p>
-              </div>
-            )}
-
-            {/* DEBT INFO */}
-            {selectedRestock.debt?.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  Debt History
-                </h3>
-                <div className="space-y-2">
-                  {selectedRestock.debt?.map((debt, idx) => (
-                    <div key={idx} className="p-3 bg-yellow-50 rounded-lg">
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-medium text-gray-900">
-                          {debt.nameDebt}
-                        </p>
-                        <p className="font-medium text-gray-900">
-                          {formatCurrency(debt.totalDebt)}
-                        </p>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        Status:{" "}
-                        <span className="font-medium">{debt.status}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4 border-t">
               <button
-                onClick={() => setViewModalOpen(false)}
-                className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                onClick={() => {
+                  setSelectedHeader(null);
+                  setDetailModalOpen(false);
+                }}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
-                Close
+                Tutup
               </button>
             </div>
           </div>

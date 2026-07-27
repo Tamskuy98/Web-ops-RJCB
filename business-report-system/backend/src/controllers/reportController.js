@@ -60,9 +60,27 @@ const monthlySales = async (req, res, next) => {
   }
 };
 
+// const dashboard = async (req, res, next) => {
+//   try {
+//     const stats = await reportService.getDashboardStats();
+//     sendResponse(res, 200, stats);
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const dashboard = async (req, res, next) => {
   try {
-    const stats = await reportService.getDashboardStats();
+    const stats = await reportService.getDashboardStats(req.query);
+    sendResponse(res, 200, stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const cards = async (req, res, next) => {
+  try {
+    const stats = await reportService.getCardsHold(req.query);
     sendResponse(res, 200, stats);
   } catch (error) {
     next(error);
@@ -75,4 +93,5 @@ module.exports = {
   revenueShare,
   monthlySales,
   dashboard,
+  cards,
 };
