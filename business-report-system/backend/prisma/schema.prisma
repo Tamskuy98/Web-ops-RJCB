@@ -57,6 +57,7 @@ model Hsale {
   profit      Float
   date        DateTime @default(now())
   typePayment String
+  cashReport  Float @map("cash_report")
   cash        Float
   qris        Float
   isDeposit   String @map("is_deposit")
