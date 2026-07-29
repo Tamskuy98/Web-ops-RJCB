@@ -34,7 +34,7 @@ export default function LoginPage() {
       {/* Background PNG */}
       <div className="absolute inset-0">
         <img
-          src="src/assets/BG-LOGIN.png" // ganti dengan lokasi background kamu
+          src="/BG-LOGIN.png" // ganti dengan lokasi background kamu
           alt="Background"
           className="w-full h-full object-cover"
         />
@@ -52,7 +52,7 @@ export default function LoginPage() {
             <div className="flex flex-col items-center mb-8">
               {/* Logo */}
               <img
-                src="src/assets/LOGO.png"
+                src="/LOGO.png"
                 alt="Logo"
                 className="w-20 h-20 object-contain mb-4"
               />

@@ -61,7 +61,7 @@ export default function Sidebar({ open, onClose }) {
           <div className="flex items-center gap-2">
             {/* <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center"> */}
             <img
-              src="src/assets/LOGO.png"
+              src="/LOGO.png"
               alt="RAJACIRENGBEKASI"
               className="w-8 h-8 object-contain"
             />
