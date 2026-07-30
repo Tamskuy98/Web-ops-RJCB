@@ -31,25 +31,6 @@ services:
       - postgres
 
   ####################################################
-  # FRONTEND REACT
-  ####################################################
-  frontend:
-    # Build dari folder frontend
-    build:
-      context: ./frontend
-
-    container_name: react_frontend
-
-    restart: always
-
-    # React akan dilayani nginx
-    expose:
-      - "80"
-
-    networks:
-      - app_network
-
-  ####################################################
   # DATABASE POSTGRESQL
   ####################################################
   postgres:
@@ -114,7 +95,6 @@ services:
       - ./nginx/certbot/www:/var/www/certbot
 
     depends_on:
-      - frontend
       - backend
 
     networks:
