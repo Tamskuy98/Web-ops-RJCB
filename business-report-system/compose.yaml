@@ -34,43 +34,43 @@ services:
   # DATABASE POSTGRESQL
   ####################################################
   postgres:
-    db:
-      # Pakai image resmi PostgreSQL
-      image: postgres:16
+    #db:
+    # Pakai image resmi PostgreSQL
+    image: postgres:16
 
-      container_name: postgres_database
+    container_name: postgres_database
 
-      restart: always
+    restart: always
 
-      # Konfigurasi database
-      environment:
-        # User database
-        POSTGRES_USER: ${POSTGRES_USER}
+    # Konfigurasi database
+    environment:
+      # User database
+      POSTGRES_USER: ${POSTGRES_USER}
 
-        # Password database
-        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Password database
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-        # Nama database
-        POSTGRES_DB: ${POSTGRES_DB}
+      # Nama database
+      POSTGRES_DB: ${POSTGRES_DB}
 
-      # Simpan data permanen
-      volumes:
-        # Nama volume :
-        # lokasi database postgres di container
-        - postgres_data:/var/lib/postgresql/data
+    # Simpan data permanen
+    volumes:
+      # Nama volume :
+      # lokasi database postgres di container
+      - postgres_data:/var/lib/postgresql/data
 
-      expose:
-        - "5432"
+    expose:
+      - "5432"
 
-      networks:
-        - app_network
+    networks:
+      - app_network
 
   ####################################################
   # NGINX REVERSE PROXY
   ####################################################
   nginx:
     build:
-      context: ./nginx
+      context: .
 
     container_name: nginx_proxy
 
