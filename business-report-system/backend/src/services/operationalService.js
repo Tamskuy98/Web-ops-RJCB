@@ -58,7 +58,7 @@ const createoperational = async (payload = {}) => {
         qris > 0 && "QRIS",
       ]
         .filter(Boolean)
-        .join(";") || "DIBAYAR DENGAN HUTANG";
+        .join(";") || "HUTANG";
 
     //SUPLIER ON FE
     //DATE ON PRISMA
