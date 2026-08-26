@@ -7,6 +7,15 @@ import { formatDate, formatCurrency } from "../utils/helpers";
 import { Plus, Trash2, X, Eye } from "lucide-react";
 import PageHeader from "../components/pageHeader";
 import Cards from "../components/Cards";
+import {
+  StatusBadge,
+  THead,
+  Th,
+  Tr,
+  Td,
+  TableEmpty,
+  ActionButton,
+} from "../components/TableUtils";
 
 // ========================================
 // HELPER REALTIME CARDS
@@ -400,14 +409,16 @@ export default function OperationalPage() {
   return (
     <div className="space-y-4">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="">
         <PageHeader
-          title="Menu Laporan Belanja Operasional"
+          title="Belanja Operasional"
           description="Pantau pengeluaran operasional, analisis transaksi, dan laporan belanja berdasarkan periode."
         />
+      </div>
+      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-3">
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          className="w-50 flex justify-center items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
           <Plus size={16} /> Tambah
         </button>
@@ -419,102 +430,61 @@ export default function OperationalPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Tanggal
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Supplier
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Total Belanja
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Tipe Bayar
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Sisa Hutang
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+            <table className="w-full text-xs sm:text-sm">
+              <THead>
+                <Th>Tanggal</Th>
+                <Th hide="lg">Supplier</Th>
+                <Th>Total Belanja</Th>
+                <Th>Tipe Bayar</Th>
+                <Th align="center">Status</Th>
+                <Th hide="lg">Sisa Hutang</Th>
+                <Th align="center">Aksi</Th>
+              </THead>
               <tbody>
                 {paginated.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-gray-300 hover:bg-gray-50"
-                  >
-                    <td className="py-3 px-4 text-gray-600">
-                      {formatDate(item.date)}
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">{item.supplier}</td>
-                    <td className="py-3 px-4 text-left font-medium text-gray-900">
+                  <Tr key={item.id}>
+                    <Td className="text-gray-600">{formatDate(item.date)}</Td>
+                    <Td hide="lg" className="text-gray-700">
+                      {item.supplier}
+                    </Td>
+                    <Td className="font-medium text-gray-900">
                       {formatCurrency(item.totalPayment || 0)}
-                    </td>
-                    <td className="py-3 px-4 text-left font-small">
+                    </Td>
+                    <Td>
                       {item.typePayment ? (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1">
                           {item.typePayment.split(";").map((payment, index) => (
-                            <span
-                              key={index}
-                              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                paymentColor[payment] ||
-                                "bg-gray-100 text-gray-700"
-                              }`}
-                            >
-                              {payment}
-                            </span>
+                            <StatusBadge key={index} status={payment} />
                           ))}
                         </div>
                       ) : (
                         "-"
                       )}
-                    </td>
-
-                    <td className="py-3 px-4 text-gray-600">
-                      <span
-                        className={`inline-block rounded px-2 py-1 text-xs font-medium ${
-                          item?.debt?.[0]?.status
-                            ?.toUpperCase()
-                            .includes("HUTANG")
-                            ? "bg-red-100 text-red-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {(item?.debt?.[0]?.status ?? "LUNAS").toUpperCase()}
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-4 text-left text-red-900">
+                    </Td>
+                    <Td align="center">
+                      <StatusBadge
+                        status={(
+                          item?.debt?.[0]?.status ?? "LUNAS"
+                        ).toUpperCase()}
+                      />
+                    </Td>
+                    <Td hide="lg" className="text-red-900">
                       {formatCurrency(item.debt?.[0]?.outstandingPay || 0)}
-                    </td>
-
-                    <td className="py-3 px-4 text-center">
+                    </Td>
+                    <Td align="center">
                       <div className="flex items-center justify-center gap-1">
-                        <button
+                        <ActionButton
+                          icon={Eye}
+                          variant="view"
+                          title="Lihat detail"
                           onClick={() => openDetailView(item)}
-                          className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
-                          title="View details"
-                        >
-                          <Eye size={15} />
-                        </button>
+                        />
                       </div>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
                 {paginated.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-gray-400">
-                      Tidak ada data
-                    </td>
-                  </tr>
+                  <TableEmpty message="Tidak ada data" />
                 )}
               </tbody>
             </table>

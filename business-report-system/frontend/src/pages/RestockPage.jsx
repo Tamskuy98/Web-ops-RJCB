@@ -422,10 +422,10 @@ export default function RestockPage() {
           description="Tambah stok produk, analisis transaksi penambahan produk, dan laporan berdasarkan periode."
         />
       </div>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-3">
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          className="w-50 flex justify-center items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
           <Plus size={16} /> Tambah
         </button>
