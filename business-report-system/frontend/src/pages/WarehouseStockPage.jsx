@@ -3,7 +3,7 @@ import api from "../services/api";
 import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { getStockStatus } from "../utils/helpers";
-import PageHeader from "../components/PageHeader";
+import PageHeader from "../components/pageHeader";
 import {
   PieChart,
   Pie,
