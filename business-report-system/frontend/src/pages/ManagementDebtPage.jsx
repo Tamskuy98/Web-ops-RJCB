@@ -4,7 +4,17 @@ import Modal from "../components/Modal";
 import { formatDate, formatCurrency } from "../utils/helpers";
 import { Trash2, Eye } from "lucide-react";
 import Pagination from "../components/Pagination";
+import PageHeader from "../components/pageHeader";
 import Cards from "../components/Cards";
+import {
+  StatusBadge,
+  THead,
+  Th,
+  Tr,
+  Td,
+  TableEmpty,
+  ActionButton,
+} from "../components/TableUtils";
 
 export default function ManagementDebtPage() {
   const [debts, setDebts] = useState([]);
@@ -20,6 +30,7 @@ export default function ManagementDebtPage() {
   const [page, setPage] = useState(1);
   const perPage = 10;
   const [valueCards, setCards] = useState(0);
+  const [openPayDebt, setOpenPayDebt] = useState(false);
 
   const handlePaymentChange = (e) => {
     const { name, value } = e.target;
@@ -134,7 +145,13 @@ export default function ManagementDebtPage() {
   return (
     <div className="space-y-4">
       {/* HEADER */}
-      <h1 className="text-2xl font-bold text-gray-900">Kelola Hutang</h1>
+      {/* <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"> */}
+      <div>
+        <PageHeader
+          title="Manajemen Hutang"
+          description="Lihat ringkasan hutang, pembayaran hutang, dan laporan berdasarkan periode."
+        />
+      </div>
 
       {/* FILTERS */}
       <div className="bg-white rounded-lg shadow p-4">
@@ -178,257 +195,250 @@ export default function ManagementDebtPage() {
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="order-1 lg:order-2">
-          <div className="sticky top-6 max-h-[77vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            {/* Outstanding */}
-            <div className="mb-6 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 p-6 text-white shadow-lg">
-              <p className="text-sm opacity-80">Sisa Hutang</p>
+      {/* BUTTON PAY */}
+      <div className="w-full flex justify-end">
+        <button
+          onClick={() => setOpenPayDebt(!openPayDebt)}
+          className={`w-40 justify-center inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
+            openPayDebt
+              ? "bg-gray-100 text-black border border-gray-300 hover:bg-gray-200"
+              : "bg-red-600 text-white hover:bg-red-700 shadow-sm"
+          }`}
+        >
+          {openPayDebt ? "Batal" : "Bayar Hutang"}
+        </button>
+      </div>
 
-              <h2 className="mt-2 text-3xl font-bold">
-                {formatCurrency(valueCards?.realtimeOutstandingPay)}
-              </h2>
+      {/* TABLE PAY DEBT*/}
+      <div
+        className={`grid gap-6 ${openPayDebt ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1"}`}
+      >
+        {openPayDebt && (
+          <div className="order-1 lg:order-2">
+            <div className="sticky top-6 max-h-[77vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              {/* Outstanding */}
+              <div className="mb-6 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 p-6 text-white shadow-lg">
+                <p className="text-sm opacity-80">Sisa Hutang</p>
 
-              <p className="mt-2 text-xs opacity-70">
-                Total hutang yang belum dibayarkan.
-              </p>
-            </div>
+                <h2 className="mt-2 text-3xl font-bold">
+                  {formatCurrency(valueCards?.realtimeOutstandingPay)}
+                </h2>
 
-            {emptyBalance && (
-              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-amber-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 9v4m0 4h.01M10.29 3.86l-8.18 14A2 2 0 003.82 21h16.36a2 2 0 001.71-3.14l-8.18-14a2 2 0 00-3.42 0z"
+                <p className="mt-2 text-xs opacity-70">
+                  Total hutang yang belum dibayarkan.
+                </p>
+              </div>
+
+              {emptyBalance && (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-amber-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 9v4m0 4h.01M10.29 3.86l-8.18 14A2 2 0 003.82 21h16.36a2 2 0 001.71-3.14l-8.18-14a2 2 0 00-3.42 0z"
+                      />
+                    </svg>
+                  </div>
+
+                  <div>
+                    <p className="font-medium text-amber-900">
+                      Saldo operasional tidak tersedia
+                    </p>
+                    <p className="mt-1 text-sm text-amber-700">
+                      Tidak dapat melakukan pelunasan/pembayaran hutang
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Saldo */}
+              <div className="mb-6 mt-3">
+                <h3 className="mb-4 text-sm font-semibold text-gray-700">
+                  Saldo Tersedia
+                </h3>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {realtimeCards.map((card) => (
+                    <Cards
+                      key={card.type}
+                      variant="saldo"
+                      type={card.type}
+                      value={card.value}
+                      className="w-full"
                     />
-                  </svg>
-                </div>
-
-                <div>
-                  <p className="font-medium text-amber-900">
-                    Saldo operasional tidak tersedia
-                  </p>
-                  <p className="mt-1 text-sm text-amber-700">
-                    Tidak dapat melakukan pelunasan/pembayaran hutang
-                  </p>
+                  ))}
                 </div>
               </div>
-            )}
 
-            {/* Saldo */}
-            <div className="mb-6 mt-3">
-              <h3 className="mb-4 text-sm font-semibold text-gray-700">
-                Saldo Tersedia
-              </h3>
+              <div className="my-6 border-t border-gray-100" />
 
-              <div className="grid grid-cols-1 gap-3">
-                {realtimeCards.map((card) => (
-                  <Cards
-                    key={card.type}
-                    variant="saldo"
-                    type={card.type}
-                    value={card.value}
-                    className="w-full"
-                  />
-                ))}
+              {/* Pembayaran */}
+              {!emptyBalance && (
+                <form onSubmit={handlePayment} className="space-y-4">
+                  {/* Cash On Hand */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                      <span>Cash On Hand</span>
+
+                      {readOnlyMap.cashHand && (
+                        <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                          Saldo Habis
+                        </span>
+                      )}
+                    </label>
+
+                    <input
+                      readOnly={readOnlyMap.cashHand}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      name="cashHand"
+                      value={paymentForm.cashHand}
+                      onChange={handlePaymentChange}
+                      placeholder="0"
+                      className={inputClass(readOnlyMap.cashHand)}
+                    />
+                  </div>
+
+                  {/* Cash Hold */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                      <span>Cash Hold</span>
+
+                      {readOnlyMap.cashHold && (
+                        <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                          Saldo Habis
+                        </span>
+                      )}
+                    </label>
+
+                    <input
+                      readOnly={readOnlyMap.cashHold}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      name="cashHold"
+                      value={paymentForm.cashHold}
+                      onChange={handlePaymentChange}
+                      placeholder="0"
+                      className={inputClass(readOnlyMap.cashHold)}
+                    />
+                  </div>
+
+                  {/* QRIS */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
+                      <span>QRIS</span>
+
+                      {readOnlyMap.qris && (
+                        <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                          Saldo Habis
+                        </span>
+                      )}
+                    </label>
+
+                    <input
+                      readOnly={readOnlyMap.qris}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      name="qris"
+                      value={paymentForm.qris}
+                      onChange={handlePaymentChange}
+                      placeholder="0"
+                      className={inputClass(readOnlyMap.qris)}
+                    />
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <button
+                      type="submit"
+                      // disabled={saving}
+                      className="h-full w-full px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Bayar
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div>
+                <button></button>
               </div>
-            </div>
-
-            <div className="my-6 border-t border-gray-100" />
-
-            {/* Pembayaran */}
-            {!emptyBalance && (
-              <form onSubmit={handlePayment} className="space-y-4">
-                {/* Cash On Hand */}
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
-                    <span>Cash On Hand</span>
-
-                    {readOnlyMap.cashHand && (
-                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
-                        Saldo Habis
-                      </span>
-                    )}
-                  </label>
-
-                  <input
-                    readOnly={readOnlyMap.cashHand}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    name="cashHand"
-                    value={paymentForm.cashHand}
-                    onChange={handlePaymentChange}
-                    placeholder="0"
-                    className={inputClass(readOnlyMap.cashHand)}
-                  />
-                </div>
-
-                {/* Cash Hold */}
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
-                    <span>Cash Hold</span>
-
-                    {readOnlyMap.cashHold && (
-                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
-                        Saldo Habis
-                      </span>
-                    )}
-                  </label>
-
-                  <input
-                    readOnly={readOnlyMap.cashHold}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    name="cashHold"
-                    value={paymentForm.cashHold}
-                    onChange={handlePaymentChange}
-                    placeholder="0"
-                    className={inputClass(readOnlyMap.cashHold)}
-                  />
-                </div>
-
-                {/* QRIS */}
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <label className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700">
-                    <span>QRIS</span>
-
-                    {readOnlyMap.qris && (
-                      <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
-                        Saldo Habis
-                      </span>
-                    )}
-                  </label>
-
-                  <input
-                    readOnly={readOnlyMap.qris}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    name="qris"
-                    value={paymentForm.qris}
-                    onChange={handlePaymentChange}
-                    placeholder="0"
-                    className={inputClass(readOnlyMap.qris)}
-                  />
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <button
-                    type="submit"
-                    // disabled={saving}
-                    className="h-full w-full px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Bayar
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div>
-              <button></button>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="order-2 lg:order-1 lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div
+          className={`order-2 lg:order-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden ${openPayDebt ? "lg:col-span-2" : ""}`}
+        >
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 h-[650px] flex flex-col">
-            <div className="flex-1  overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">
-                      Tanggal
-                    </th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">
-                      Jenis Hutang
-                    </th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">
-                      Total Hutang
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">
-                      Pemberi Hutang
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">
-                      Status
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">
-                      Sisa Hutang
-                    </th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">
-                      Aksi
-                    </th>
-                  </tr>
-                </thead>
+            <div className="flex-1 overflow-x-auto">
+              <table className="w-full text-xs sm:text-sm">
+                <THead>
+                  <Th>Tanggal</Th>
+                  <Th align="center" hide="sm">
+                    Jenis Hutang
+                  </Th>
+                  <Th align="center">Total Hutang</Th>
+                  <Th align="center" hide="md">
+                    Pemberi Hutang
+                  </Th>
+                  {/* <Th hide="lg">Status</Th> */}
+                  <Th align="center">Sisa Hutang</Th>
+                  <Th align="center">Status</Th>
+                  <Th align="center">Aksi</Th>
+                </THead>
                 <tbody>
                   {paginated.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="border-t border-gray-300 hover:bg-gray-50"
-                    >
-                      <td className="py-3 px-4 text-gray-600">
-                        {formatDate(item.date)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
+                    <Tr key={item.id}>
+                      <Td className="text-gray-600">{formatDate(item.date)}</Td>
+                      <Td align="center" hide="sm">
                         {filterCategory(item.restockId)}
-                        {/* {item.restockId} */}
-                      </td>
-                      <td className="py-3 px-4 text-center font-medium">
+                      </Td>
+                      <Td align="center" className="font-medium">
                         {formatCurrency(item.totalDebt || 0)}
-                      </td>
-                      <td className="py-3 px-4 text-left font-medium text-gray-900">
+                      </Td>
+                      <Td
+                        align="center"
+                        hide="md"
+                        className="font-medium text-gray-900"
+                      >
                         {item.nameDebt || "-"}
-                      </td>
-                      <td className="py-3 px-4 text-gray-600">
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                            item.status === "LUNAS"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {item.status || "-"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-left text-red-900">
+                      </Td>
+                      <Td align="center" className="text-red-900">
                         {formatCurrency(item.outstandingPay || 0)}
-                      </td>
-
-                      <td className="py-3 px-4 text-center space-x-2 flex items-center justify-center">
-                        <button
-                          onClick={() => openView(item)}
-                          className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
+                      </Td>
+                      <Td align="center">
+                        <StatusBadge status={item.status || "HUTANG"} />
+                      </Td>
+                      <Td align="center">
+                        <div className="flex items-center justify-center gap-1">
+                          <ActionButton
+                            icon={Eye}
+                            variant="view"
+                            title="Lihat detail"
+                            onClick={() => openView(item)}
+                          />
+                          <ActionButton
+                            icon={Trash2}
+                            variant="delete"
+                            title="Hapus"
+                            onClick={() => handleDelete(item.id)}
+                          />
+                        </div>
+                      </Td>
+                    </Tr>
                   ))}
                   {paginated.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="py-8 text-center text-gray-400"
-                      >
-                        Tidak ada data
-                      </td>
-                    </tr>
+                    <TableEmpty message="Tidak ada data" />
                   )}
                 </tbody>
               </table>

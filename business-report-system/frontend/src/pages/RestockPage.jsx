@@ -5,7 +5,17 @@ import Pagination from "../components/Pagination";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatDate, formatCurrency } from "../utils/helpers";
 import { Plus, Trash2, Eye, X } from "lucide-react";
+import PageHeader from "../components/PageHeader";
 import Cards from "../components/Cards";
+import {
+  StatusBadge,
+  THead,
+  Th,
+  Tr,
+  Td,
+  TableEmpty,
+  ActionButton,
+} from "../components/TableUtils";
 
 const defaultFormState = {
   date: "",
@@ -406,11 +416,16 @@ export default function RestockPage() {
   return (
     <div className="space-y-4">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Restock Produk</h1>
+      <div>
+        <PageHeader
+          title="Pengadaan Produk"
+          description="Tambah stok produk, analisis transaksi penambahan produk, dan laporan berdasarkan periode."
+        />
+      </div>
+      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-3">
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          className="w-50 flex justify-center items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
           <Plus size={16} /> Tambah
         </button>
@@ -422,115 +437,77 @@ export default function RestockPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Tanggal
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Item
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Qty
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Total Belanja
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Supplier
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Tipe Bayar
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">
-                    Sisa Hutang
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+            <table className="w-full text-xs sm:text-sm">
+              <THead>
+                <Th>Tanggal</Th>
+                <Th align="center" hide="sm">
+                  Total jenis produk
+                </Th>
+                <Th align="center" hide="md">
+                  Total produk
+                </Th>
+                <Th>Total Bayar</Th>
+                <Th hide="lg">Supplier</Th>
+                <Th>Tipe Bayar</Th>
+                <Th align="center">Status</Th>
+                <Th hide="lg">Sisa Hutang</Th>
+                <Th align="center">Aksi</Th>
+              </THead>
               <tbody>
                 {paginated.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-gray-300 hover:bg-gray-50"
-                  >
-                    <td className="py-3 px-4 text-gray-600">
-                      {formatDate(item.date)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
+                  <Tr key={item.id}>
+                    <Td className="text-gray-600">{formatDate(item.date)}</Td>
+                    <Td align="center" hide="sm">
                       {item.restockDetail?.length || 0}
-                    </td>
-                    <td className="py-3 px-4 text-center font-medium">
+                    </Td>
+                    <Td align="center" hide="md" className="font-medium">
                       {item.allQty}
-                    </td>
-                    <td className="py-3 px-4 text-left font-medium text-gray-900">
+                    </Td>
+                    <Td className="font-medium text-gray-900">
                       {formatCurrency(item.totalPayment || 0)}
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">{item.supplier}</td>
-                    <td className="py-3 px-4 text-left font-small">
+                    </Td>
+                    <Td hide="lg" className="text-gray-700">
+                      {item.supplier}
+                    </Td>
+                    <Td>
                       {item.typePayment ? (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1">
                           {item.typePayment.split(";").map((payment, index) => (
-                            <span
-                              key={index}
-                              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                paymentColor[payment] ||
-                                "bg-gray-100 text-gray-700"
-                              }`}
-                            >
-                              {payment}
-                            </span>
+                            <StatusBadge key={index} status={payment} />
                           ))}
                         </div>
                       ) : (
                         "-"
                       )}
-                    </td>
-
-                    <td className="py-3 px-4 text-gray-600 text-center">
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          item?.debt?.[0]?.status === "HUTANG"
-                            ? "bg-red-500 text-white"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {item?.debt?.[0]?.status || "LUNAS "}
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-4 text-left text-red-900">
+                    </Td>
+                    <Td align="center">
+                      <StatusBadge
+                        status={item?.debt?.[0]?.status || "LUNAS"}
+                      />
+                    </Td>
+                    <Td hide="lg" className="text-red-900">
                       {formatCurrency(item?.debt?.[0]?.outstandingPay || 0)}
-                    </td>
-
-                    <td className="py-3 px-4 text-center space-x-2 flex items-center justify-center">
-                      <button
-                        onClick={() => openView(item)}
-                        className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
+                    </Td>
+                    <Td align="center">
+                      <div className="flex items-center justify-center gap-1">
+                        <ActionButton
+                          icon={Eye}
+                          variant="view"
+                          title="Lihat detail"
+                          onClick={() => openView(item)}
+                        />
+                        {/* <ActionButton
+                          icon={Trash2}
+                          variant="delete"
+                          title="Hapus"
+                          onClick={() => handleDelete(item.id)}
+                        /> */}
+                      </div>
+                    </Td>
+                  </Tr>
                 ))}
                 {paginated.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-400">
-                      Tidak ada data
-                    </td>
-                  </tr>
+                  <TableEmpty message="Tidak ada data" />
                 )}
               </tbody>
             </table>

@@ -14,6 +14,7 @@ import ProfitSharePage from "./pages/ProfitSharePage";
 import WhatsappServicePage from "./pages/WhatsappServicePage";
 import ManagementDebtPage from "./pages/ManagementDebtPage";
 import SettingsPage from "./pages/SettingsPage";
+import UserManagementPage from "./pages/UserManagementPage";
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="profit-share" element={<ProfitSharePage />} />
         <Route path="whatsapp-service" element={<WhatsappServicePage />} />
+        <Route path="user-management" element={<UserManagementPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

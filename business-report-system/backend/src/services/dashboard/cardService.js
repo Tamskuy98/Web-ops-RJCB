@@ -16,6 +16,7 @@ const getCards = async (where) => {
       _sum: {
         allquantity: true,
         total: true,
+        profit: true,
       },
     }),
 
@@ -96,6 +97,8 @@ const getCards = async (where) => {
 
   const totalSales = salesSummary._sum.allquantity ?? 0;
   const totalRevenue = salesSummary._sum.total ?? 0;
+  // Net income (Pendapatan Bersih): sum of Hsale.profit within the same date range
+  const totalProfit = salesSummary._sum.profit ?? 0;
 
   const totalOpsCost = operationalSummary._sum.totalPayment ?? 0;
   const totalSupplyCost = restockSummary._sum.totalPayment ?? 0;
@@ -127,6 +130,7 @@ const getCards = async (where) => {
   return {
     totalSales,
     totalRevenue,
+    totalProfit,
     totalOpsCost,
     totalSupplyCost,
     totalPayDebt,

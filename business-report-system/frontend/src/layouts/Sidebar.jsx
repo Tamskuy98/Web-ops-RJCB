@@ -12,19 +12,26 @@ import {
   PieChart,
   Settings,
   BadgeAlert,
+  Users,
 } from "lucide-react";
 
 const allMenuItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/products", icon: Package, label: "Products" },
-  { to: "/sales", icon: ShoppingCart, label: "Sales" },
+  { to: "/products", icon: Package, label: "Manajemen Produk" },
+  { to: "/sales", icon: ShoppingCart, label: "Penjualan" },
   { to: "/operational", icon: ArrowDownToLine, label: "Belanja Operasional" },
-  { to: "/restock", icon: RefreshCw, label: "Restock" },
-  { to: "/warehouse", icon: Warehouse, label: "Warehouse Stock" },
-  { to: "/management-debt", icon: BadgeAlert, label: "Management Debt" },
+  { to: "/restock", icon: RefreshCw, label: "Pengadaan Produk" },
+  { to: "/warehouse", icon: Warehouse, label: "Monitoring Stok Produk" },
+  { to: "/management-debt", icon: BadgeAlert, label: "Manajemen Hutang" },
   { to: "/reports", icon: FileText, label: "Reports" },
   { to: "/profit-share", icon: PieChart, label: "Profit Share" },
   { to: "/whatsapp-service", icon: PieChart, label: "Whatsapp Service" },
+  {
+    to: "/user-management",
+    icon: Users,
+    label: "User Management",
+    adminOnly: true,
+  },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -39,7 +46,7 @@ const getMenuByRole = (role) => {
       ["/", "/reports", "/profit-share", "/settings"].includes(item.to),
     );
   }
-  // Admin or default: show all items
+  // Admin or default: show all items (including admin-only)
   return allMenuItems;
 };
 

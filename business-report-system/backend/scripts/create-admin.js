@@ -18,7 +18,9 @@ const createAdmin = async () => {
     if (existingAdmin) {
       console.log("⚠️  Admin user sudah ada");
       console.log(`   Email: ${existingAdmin.email}`);
-      console.log(`   Role: ${existingAdmin.role}\n`);
+      console.log(`   Role: ${existingAdmin.role}`);
+      console.log(`   Branch: ${existingAdmin.branch}`);
+      console.log(`   Status: ${existingAdmin.status}\n`);
     } else {
       // Hash password
       const hashedPassword = await bcrypt.hash("Cirengisi123", 12);
@@ -30,13 +32,19 @@ const createAdmin = async () => {
           email: "admin@example.com",
           password: hashedPassword,
           role: "admin",
+          createdAt: new Date(),
+          branch: "BKSI-PUP",
+          updatedAt: new Date(),
+          status: "approved",
         },
       });
 
       console.log("✅ Admin user berhasil dibuat");
       console.log(`   Email: ${admin.email}`);
       console.log(`   Password: Cirengisi123`);
-      console.log(`   Role: ${admin.role}\n`);
+      console.log(`   Role: ${admin.role}`);
+      console.log(`   Branch: ${admin.branch}`);
+      console.log(`   Status: ${admin.status}\n`);
     }
   } catch (error) {
     console.error("❌ Error:", error.message);

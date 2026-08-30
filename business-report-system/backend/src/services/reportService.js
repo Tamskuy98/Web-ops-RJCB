@@ -61,6 +61,7 @@ const getRevenueShare = async ({
   pemilikasetmahalPercentage,
   startDate,
   endDate,
+  cardsOverride,
 }) => {
   const where = {};
 
@@ -71,20 +72,39 @@ const getRevenueShare = async ({
     };
   }
 
-  const sales = await prisma.sale.findMany({ where });
-  const totalProfit = sales.reduce((sum, s) => sum + Number(s.profit), 0);
+  // Reuse the same cardService figures the Dashboard/PDF already show, so the
+  // share base always matches "Akumulasi Total Saldo (Cash Flow)" 1:1.
+  // Callers that already fetched cards (e.g. financialReportService) can pass
+  // cardsOverride to avoid an extra aggregate query.
+  const cards = cardsOverride || (await getCards(where));
 
-  // const ownerShare = (totalProfit * ownerPercentage) / 100;
-  // const partnerShare = (totalProfit * partnerPercentage) / 100;
-  const ownerShare = (totalProfit * ownerPercentage) / 100;
-  const pelakuusahaShare = (totalProfit * pelakuusahaPercentage) / 100;
-  const pemilikasettetapShare =
-    (totalProfit * pemilikasettetapPercentage) / 100;
-  const pemilikasetmahalShare =
-    (totalProfit * pemilikasetmahalPercentage) / 100;
+  const cashflowBelumDisetor = cards.realtimeCashHold;
+  const cashflowSudahDisetor = cards.realtimeCashHand;
+  const cashflowQris = cards.realtimeQris;
+  const totalCashflow =
+    cashflowBelumDisetor + cashflowSudahDisetor + cashflowQris;
+  const totalHutangBelumLunas = cards.realtimeOutstandingPay;
+  const totalProfit = cards.totalProfit;
+  // Total Pengeluaran = biaya operasional + biaya restock + biaya bayar hutang
+  const totalPengeluaran =
+    cards.totalOpsCost + cards.totalSupplyCost + cards.totalPayDebt;
+
+  // Bagi hasil dihitung dari akumulasi total saldo (cashflow), bukan profit.
+  const shareBase = totalCashflow;
+  const ownerShare = (shareBase * ownerPercentage) / 100;
+  const pelakuusahaShare = (shareBase * pelakuusahaPercentage) / 100;
+  const pemilikasettetapShare = (shareBase * pemilikasettetapPercentage) / 100;
+  const pemilikasetmahalShare = (shareBase * pemilikasetmahalPercentage) / 100;
 
   return {
     totalProfit,
+    totalCashflow,
+    cashflowBelumDisetor,
+    cashflowSudahDisetor,
+    cashflowQris,
+    totalHutangBelumLunas,
+    totalPengeluaran,
+    shareBase,
     ownerPercentage,
     pelakuusahaPercentage,
     pemilikasettetapPercentage,

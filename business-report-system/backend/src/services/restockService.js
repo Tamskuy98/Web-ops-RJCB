@@ -1,5 +1,10 @@
 const prisma = require("../prisma/client");
 const { useCashHold } = require("./depositService.js");
+const { getCards } = require("./dashboard/cardService");
+const {
+  BALANCE_TYPES,
+  createTransactionLogs,
+} = require("./transactionLogService");
 
 const getAllRestocks = async () => {
   return prisma.restock.findMany({
@@ -66,6 +71,7 @@ const createRestock = async (payload = {}) => {
 
     // HANDLE OUTSTANDINGPAY
     const outstandingPay = totalPayment - (cashOnHand + cashHold + qris);
+    const balancesBefore = await getCards({});
 
     if (Number(outstandingPay) !== Number(data.outstandingPay)) {
       throw new Error("Total debt not Match");
@@ -165,6 +171,38 @@ const createRestock = async (payload = {}) => {
           },
         });
       }
+
+      await createTransactionLogs({
+        db: tx,
+        modulId: restock.id,
+        modul: "restock",
+        entries: [
+          {
+            balanceType: BALANCE_TYPES.CASH_UNSETTLED,
+            type: "OUT",
+            amount: cashHold,
+            balanceBefore: balancesBefore.realtimeCashHold,
+          },
+          {
+            balanceType: BALANCE_TYPES.CASH_SETTLED,
+            type: "OUT",
+            amount: cashOnHand,
+            balanceBefore: balancesBefore.realtimeCashHand,
+          },
+          {
+            balanceType: BALANCE_TYPES.QRIS,
+            type: "OUT",
+            amount: qris,
+            balanceBefore: balancesBefore.realtimeQris,
+          },
+          {
+            balanceType: BALANCE_TYPES.DEBT,
+            type: "OUT",
+            amount: outstandingPay,
+            balanceBefore: balancesBefore.realtimeOutstandingPay,
+          },
+        ],
+      });
 
       return restock.id;
     });

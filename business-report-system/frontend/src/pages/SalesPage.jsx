@@ -6,6 +6,16 @@ import { formatCurrency } from "../utils/helpers";
 import { Plus, Pencil, Trash2, X, Eye } from "lucide-react";
 import Cards from "../components/Cards";
 import PageHeader from "../components/pageHeader";
+import {
+  StatusBadge,
+  TableContainer,
+  THead,
+  Th,
+  Tr,
+  Td,
+  TableEmpty,
+  ActionButton,
+} from "../components/TableUtils";
 
 export default function SalesPage() {
   const [sales, setSales] = useState([]);
@@ -336,7 +346,7 @@ export default function SalesPage() {
     <div className="space-y-4">
       {/* //HEADER */}
       <PageHeader
-        title="Menu Laporan Penjualan"
+        title="Laporan Penjualan"
         description="Lihat ringkasan penjualan, analisis transaksi, dan laporan berdasarkan periode."
       />
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -434,157 +444,143 @@ export default function SalesPage() {
           >
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Tanggal
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Total Terjual (Pcs)
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Total Pendapatan
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Total Pendapatan Cash
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Total Pendapatan Qris
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Tipe Pembayaran
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Total Keuntungan
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Setoran
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        status
-                      </th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">
-                        Actions
-                      </th>
-                      {openDeposit && (
-                        <th className="text-center py-3 px-4 font-medium text-gray-600"></th>
-                      )}
-                    </tr>
-                  </thead>
+                <table className="w-full text-xs sm:text-sm">
+                  <THead>
+                    <Th>Tanggal</Th>
+                    <Th align="center" hide="sm">
+                      Total Terjual
+                    </Th>
+                    <Th align="center">Total Pendapatan</Th>
+                    <Th align="center" hide="xl">
+                      Cash
+                    </Th>
+                    <Th align="center" hide="xl">
+                      QRIS
+                    </Th>
+                    <Th align="center" hide="md">
+                      Tipe Pembayaran
+                    </Th>
+                    <Th align="center" hide="lg">
+                      Keuntungan
+                    </Th>
+                    <Th align="center">Setor</Th>
+                    <Th align="center">Status</Th>
+                    <Th align="center">Aksi</Th>
+                    {openDeposit && <Th align="center"></Th>}
+                  </THead>
                   <tbody>
                     {getFilteredSales()
                       .sort((a, b) => new Date(b.date) - new Date(a.date))
                       .map((headersale) => (
-                        <tr
-                          key={headersale.id}
-                          className="border-t border-gray-100 hover:bg-gray-50"
-                        >
-                          <td className="py-3 px-4 text-gray-600">
-                            {/* <td className="px-4 py-3"> */}
+                        <Tr key={headersale.id}>
+                          <Td>
                             <div className="flex flex-col">
                               <span className="font-medium text-gray-900">
                                 {new Date(headersale.date).toLocaleDateString(
                                   "id-ID",
                                   {
-                                    weekday: "long",
+                                    weekday: "short",
                                   },
                                 )}
                               </span>
-                              <span className="text-sm text-gray-500">
+                              <span className="text-xs text-gray-500">
                                 {new Date(headersale.date).toLocaleDateString(
                                   "id-ID",
                                   {
                                     year: "numeric",
-                                    month: "long",
+                                    month: "short",
                                     day: "numeric",
                                   },
                                 )}
                               </span>
                             </div>
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                          </Td>
+                          <Td
+                            align="center"
+                            hide="sm"
+                            className="font-medium text-gray-900"
+                          >
                             {headersale.allquantity}
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                          </Td>
+                          <Td
+                            align="center"
+                            className="font-medium text-gray-900"
+                          >
                             {formatCurrency(
                               openDeposit ? headersale.cash : headersale.total,
                             )}
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                          </Td>
+                          <Td
+                            align="center"
+                            hide="xl"
+                            className="font-medium text-gray-900"
+                          >
                             {formatCurrency(headersale.cashReport || 0)}
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                          </Td>
+                          <Td
+                            align="center"
+                            hide="xl"
+                            className="font-medium text-gray-900"
+                          >
                             {formatCurrency(headersale.qris || 0)}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span
-                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getPaymentBadgeClass(formatPaymentType(headersale.typePayment))}`}
-                            >
-                              {formatPaymentType(
+                          </Td>
+                          <Td align="center" hide="md">
+                            <StatusBadge
+                              status={formatPaymentType(
                                 openDeposit ? "Cash" : headersale.typePayment,
                               )}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-green-600">
+                            />
+                          </Td>
+                          <Td
+                            align="center"
+                            hide="lg"
+                            className="font-medium text-green-600"
+                          >
                             {formatCurrency(headersale.profit)}
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-gray-900">
+                          </Td>
+                          <Td
+                            align="center"
+                            className="font-medium text-gray-900"
+                          >
                             {formatCurrency(headersale.cash || 0)}
-                          </td>
-                          <td className="py-3 px-4 text-center font-medium text-green-600">
-                            <span
-                              className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                          </Td>
+                          <Td align="center">
+                            <StatusBadge
+                              status={
                                 headersale.isDeposit === "Y" ||
                                 headersale.cash <= 0
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-red-100 text-red-700"
-                              }`}
-                            >
-                              {headersale.isDeposit === "Y" ||
-                              headersale.cash <= 0
-                                ? "Sudah Disetor"
-                                : "Belum Disetor"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
+                                  ? "Sudah Disetor"
+                                  : "Belum Disetor"
+                              }
+                            />
+                          </Td>
+                          <Td align="center">
                             <div className="flex items-center justify-center gap-1">
-                              <button
+                              <ActionButton
+                                icon={Eye}
+                                variant="view"
+                                title="Lihat detail"
                                 onClick={() => openDetailView(headersale)}
-                                className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg"
-                                title="View details"
-                              >
-                                <Eye size={15} />
-                              </button>
+                              />
                             </div>
-                          </td>
+                          </Td>
                           {openDeposit && (
-                            <td className="py-3 px-4 items-center">
+                            <Td align="center">
                               <div className="flex items-center justify-center gap-1">
                                 <input
                                   type="checkbox"
-                                  // checked={headersale.some(
-                                  //   (x) => x.id === headersale.id,
-                                  // )}
                                   checked={selected.includes(headersale.id)}
                                   onChange={() =>
                                     handleSelectDepo(headersale.id)
                                   }
                                 />
                               </div>
-                            </td>
+                            </Td>
                           )}
-                        </tr>
+                        </Tr>
                       ))}
                     {getFilteredSales().length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="py-8 text-center text-gray-400"
-                        >
-                          Tidak ada data Penjualan
-                        </td>
-                      </tr>
+                      <TableEmpty message="Tidak ada data Penjualan" />
                     )}
                   </tbody>
                 </table>

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
+import TransactionRecord from "../components/TransactionRecord";
+import TransactionRecordDetail from "../components/TransactionRecordDetail";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatCurrency } from "../utils/helpers";
 import {
@@ -14,6 +16,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { Download, Loader2 } from "lucide-react";
 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -26,6 +29,11 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState({ startDate: "", endDate: "" });
   const [dateRange, setDateRange] = useState([null, null]);
   const [startDate, endDate] = dateRange;
+  const [downloadingReport, setDownloadingReport] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [transactionLogs, setTransactionLogs] = useState([]);
 
   const historyCards = [
     {
@@ -80,9 +88,77 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   };
 
+  const fetchTransactionLogs = () => {
+    const params = {};
+    if (filters.startDate) params.startDate = filters.startDate;
+    if (filters.endDate) params.endDate = filters.endDate;
+
+    api
+      .get("/transaction-logs", { params })
+      .then((res) => setTransactionLogs(res.data.data || []))
+      .catch(console.error);
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchTransactionLogs();
   }, [activeTab, filters.startDate, filters.endDate]);
+
+  const openTransactionDetail = async (transaction) => {
+    try {
+      const response = await api.get(`/transaction-logs/${transaction.id}`);
+      setSelectedTransaction(response.data.data);
+    } catch (error) {
+      console.error(error);
+      setSelectedTransaction(transaction);
+    }
+  };
+
+  // Reads the JSON error message out of an error blob response (axios responseType: 'blob')
+  const parseBlobError = async (err) => {
+    const fallback = "Gagal membuat laporan. Silakan coba lagi.";
+    const data = err?.response?.data;
+    if (!(data instanceof Blob))
+      return err?.response?.data?.message || fallback;
+    try {
+      const text = await data.text();
+      return JSON.parse(text)?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    if (downloadingReport) return; // prevent multiple clicks while a download is in flight
+    setDownloadingReport(true);
+    setDownloadError("");
+    try {
+      const params = {};
+      if (filters.startDate) params.startDate = filters.startDate;
+      if (filters.endDate) params.endDate = filters.endDate;
+
+      const res = await api.get("/export/financial/pdf", {
+        params,
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const suffix =
+        filters.startDate && filters.endDate
+          ? `${filters.startDate}_${filters.endDate}`
+          : "semua-periode";
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `laporan-keuangan-${suffix}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(await parseBlobError(err));
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   if (loading || !stats) return <LoadingSpinner size="lg" />;
 
@@ -130,33 +206,57 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="inline-flex rounded-full bg-white border border-gray-200 p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              activeTab === "history"
-                ? "bg-red-600 text-white"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Laporan
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("realtime")}
-            className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              activeTab === "realtime"
-                ? "bg-red-600 text-white"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Saldo
-          </button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-full bg-white border border-gray-200 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                  activeTab === "history"
+                    ? "bg-red-600 text-white"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Laporan
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("realtime")}
+                className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                  activeTab === "realtime"
+                    ? "bg-red-600 text-white"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Saldo
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
+              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {downloadingReport ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Download size={16} />
+              )}
+              {downloadingReport ? "Membuat laporan..." : "Download Report"}
+            </button>
+          </div>
+
+          {downloadError && (
+            <p className="text-xs text-red-600 sm:text-right">
+              {downloadError}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* CARDS */}
+      {/* LAPORAN ALL */}
       {activeTab === "history" ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -232,8 +332,135 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* LAPORAN SALDO */}
+      {activeTab === "history" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">
+              Total Penjualan per Bulan (Pcs)
+            </h3>
+            {formattedMonthlySales.length > 0 ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={formattedMonthlySales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="monthDisplay" tick={{ fontSize: 12 }} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                  />
+                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <Legend />
+                  <Bar
+                    dataKey="sales"
+                    name="Total Penjualan (Pcs)"
+                    fill="#3b82f6"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-gray-400">
+                Tidak ada data penjualan
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">
+              Total Pendapatan per Bulan (Rp)
+            </h3>
+            {formattedMonthlySales.length > 0 ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={formattedMonthlySales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="monthDisplay" tick={{ fontSize: 12 }} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                  />
+                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <Legend />
+                  <Bar
+                    dataKey="revenue"
+                    name="Total Pendapatan (Rp)"
+                    fill="#3b82f6"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-gray-400">
+                Tidak ada data penjualan
+              </div>
+            )}
+          </div>
+
+          {/* <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h3 className="text-base font-semibold text-gray-900 mb-4">
+            Profit per Month
+          </h3>
+          {formattedMonthlySales.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={formattedMonthlySales}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="monthDisplay" tick={{ fontSize: 12 }} />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="totalProfit"
+                  name="Profit"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-80 flex items-center justify-center text-gray-400">
+              Tidak ada data profit
+            </div>
+          )}
+        </div> */}
+        </div>
+      ) : (
+        <>
+          <div className="mb-3">
+            <h3 className="ml-3 text-sm font-semibold text-gray-600">
+              Log Transaksi
+            </h3>
+            <div className="mt-1 ml-2 h-[1px] w-30 border-b border-gray-600" />
+          </div>
+
+          <div className="space-y-2">
+            {transactionLogs?.map((transaction) => (
+              <TransactionRecord
+                key={transaction.id}
+                transaction={transaction}
+                onClick={openTransactionDetail}
+              />
+            ))}
+
+            {transactionLogs.length === 0 && (
+              <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">
+                Belum ada log transaksi pada periode ini.
+              </div>
+            )}
+          </div>
+
+          <TransactionRecordDetail
+            transaction={selectedTransaction}
+            onClose={() => setSelectedTransaction(null)}
+          />
+        </>
+      )}
+
       {/* CHARTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">
             Total Penjualan per Bulan (Pcs)
@@ -325,7 +552,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div> */}
-      </div>
+      {/* </div> */}
 
       {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">

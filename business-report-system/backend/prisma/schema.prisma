@@ -13,7 +13,10 @@ model User {
   email     String   @unique
   password  String
   role      String   @default("warehouse")
+  branch    String?  @default("head_office") @map("branch")
+  status    String   @default("pending") @map("status") // pending, approved, rejected
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
@@ -189,3 +192,20 @@ model Deposit {
 
   @@map("deposit")
 }
+
+model LogTransaction {
+  id           Int      @id @default(autoincrement())
+  refId        String
+  total        Decimal
+  modul        String
+  typePayment  String?
+  type         String
+  before       Decimal
+  after        Decimal
+  status       String
+  created_by   String?
+  created_date DateTime @default(now())
+
+  @@map("log_transaction")
+}
+

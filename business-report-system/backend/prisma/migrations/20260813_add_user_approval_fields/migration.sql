@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN "branch" TEXT DEFAULT 'head_office',
+ADD COLUMN "status" TEXT DEFAULT 'pending',
+ADD COLUMN "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

@@ -1,6 +1,10 @@
-const { empty } = require("@prisma/client/runtime/library");
 const prisma = require("../prisma/client");
 const { useCashHold } = require("./depositService.js");
+const { getCards } = require("./dashboard/cardService");
+const {
+  BALANCE_TYPES,
+  createTransactionLogs,
+} = require("./transactionLogService");
 
 const getAllDebt = async ({ search, startDate, endDate }) => {
   const where = {};
@@ -47,6 +51,7 @@ const payDebt = async (payload = {}) => {
   if (Number(data.cashHold) > 0) tempType.push("CASH HOLD");
   if (Number(data.qris) > 0) tempType.push("QRIS");
   const typePayment = tempType.join(";");
+  const balancesBefore = await getCards({});
 
   // HANDLE DATA PAYMENT
 
@@ -124,7 +129,35 @@ const payDebt = async (payload = {}) => {
       await useCashHold(data.cashHold);
     }
 
+    await createTransactionLogs({
+      db: tx,
+      modulId: payDebt.id,
+      modul: "debt payment",
+      createdDate: payDebt.date,
+      entries: [
+        {
+          balanceType: BALANCE_TYPES.CASH_UNSETTLED,
+          type: "OUT",
+          amount: Number(data.cashHold) || 0,
+          balanceBefore: balancesBefore.realtimeCashHold,
+        },
+        {
+          balanceType: BALANCE_TYPES.CASH_SETTLED,
+          type: "OUT",
+          amount: Number(data.cashHand) || 0,
+          balanceBefore: balancesBefore.realtimeCashHand,
+        },
+        {
+          balanceType: BALANCE_TYPES.QRIS,
+          type: "OUT",
+          amount: Number(data.qris) || 0,
+          balanceBefore: balancesBefore.realtimeQris,
+        },
+      ],
+    });
+
     return {
+      payDebt,
       updatedDebts,
       remainingPayment: remaining,
     };
