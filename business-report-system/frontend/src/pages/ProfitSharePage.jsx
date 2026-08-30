@@ -152,38 +152,100 @@ export default function ProfitSharePage() {
       {loading && <LoadingSpinner />}
 
       {result && !loading && (
-        // <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        //   <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
-        //     <p className="text-sm text-gray-500">Total Profit</p>
-        //     <p className="text-2xl font-bold text-gray-900 mt-1">
-        //       {formatCurrency(result.totalProfit)}
-        //     </p>
-        //   </div>
-        //   <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-sm p-6 text-center text-white">
-        //     <p className="text-sm text-red-100">
-        //       Owner Share ({result.ownerPercentage}%)
-        //     </p>
-        //     <p className="text-2xl font-bold mt-1">
-        //       {formatCurrency(result.ownerShare)}
-        //     </p>
-        //   </div>
-        //   <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-sm p-6 text-center text-white">
-        //     <p className="text-sm text-purple-100">
-        //       Partner Share ({result.partnerPercentage}%)
-        //     </p>
-        //     <p className="text-2xl font-bold mt-1">
-        //       {formatCurrency(result.partnerShare)}
-        //     </p>
-        //   </div>
-        // </div>
-
         <div>
           <div className="w-full pb-3 pt-3">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-6 text-center">
-              <p className="text-sm text-gray-500">Total Profit</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(result.totalProfit)}
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">Total Profit</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.totalProfit)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total laba dari penjualan sebelum dikurangi biaya pengeluaran
+                </p>
+              </div>
+              <div className="bg-white relative overflow-hidden rounded-xl border border-red-400 p-5 text-center">
+                <p className="text-sm font-medium text-gray-500">
+                  Total Saldo (Cash Flow)
+                </p>
+                <p className="text-xl font-bold tracking-tight text-gray-900">
+                  {formatCurrency(result.totalCashflow)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total saldo (Cash flow) sebagai rujukan perhitungan pembagian
+                  hasil
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">
+                  Saldo Cash (Sudah Disetor)
+                </p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.cashflowSudahDisetor)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total saldo saat ini (cashflow) dari penjualan yang telah
+                  disetor ke owner
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">QRIS</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.cashflowQris)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total uang masuk (cashflow) melalui QRIS dari penjualan
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">
+                  Saldo Cash (Belum Disetor)
+                </p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.cashflowBelumDisetor)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total saldo saat ini (cashflow) dari penjualan yang belum
+                  disetor ke owner
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">Biaya Operasional</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.biayaOperasional)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total uang keluar untuk biaya operasional
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">Biaya Restock</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.biayaRestock)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total uang keluar untuk biaya restock
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">Total Hutang</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.totalHutangBelumLunas)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total hutang yang belum dilunasi dari pengeluaran belanja
+                  operasional dan restock
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-5 text-center">
+                <p className="text-sm text-gray-500">Total Pengeluaran</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(result.totalPengeluaran)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Total pengeluaran belanja operasional dan restock
+                </p>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
