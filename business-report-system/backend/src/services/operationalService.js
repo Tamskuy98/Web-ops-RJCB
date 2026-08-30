@@ -1,5 +1,10 @@
 const prisma = require("../prisma/client");
 const { useCashHold } = require("./depositService.js");
+const { getCards } = require("./dashboard/cardService");
+const {
+  BALANCE_TYPES,
+  createTransactionLogs,
+} = require("./transactionLogService");
 
 const getAlloperational = async () => {
   return prisma.operational.findMany({
@@ -78,6 +83,7 @@ const createoperational = async (payload = {}) => {
       totalPayment - (cashOnHand + cashHold + qris),
       0,
     );
+    const balancesBefore = await getCards({});
 
     // const outstandingPay = totalPayment - (cashOnHand + cashHold + qris);
     if (Number(data.outstandingPay) !== Number(outstandingPay)) {
@@ -138,6 +144,39 @@ const createoperational = async (payload = {}) => {
           },
         });
       }
+
+      await createTransactionLogs({
+        db: tx,
+        modulId: operational.id,
+        modul: "operational",
+        entries: [
+          {
+            balanceType: BALANCE_TYPES.CASH_UNSETTLED,
+            type: "OUT",
+            amount: cashHold,
+            balanceBefore: balancesBefore.realtimeCashHold,
+          },
+          {
+            balanceType: BALANCE_TYPES.CASH_SETTLED,
+            type: "OUT",
+            amount: cashOnHand,
+            balanceBefore: balancesBefore.realtimeCashHand,
+          },
+          {
+            balanceType: BALANCE_TYPES.QRIS,
+            type: "OUT",
+            amount: qris,
+            balanceBefore: balancesBefore.realtimeQris,
+          },
+          {
+            balanceType: BALANCE_TYPES.DEBT,
+            type: "OUT",
+            amount: outstandingPay,
+            balanceBefore: balancesBefore.realtimeOutstandingPay,
+          },
+        ],
+      });
+
       return operational.id;
     });
 

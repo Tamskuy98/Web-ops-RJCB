@@ -1,5 +1,10 @@
 const { empty } = require("@prisma/client/runtime/library");
+const { getCards } = require("./dashboard/cardService");
 const prisma = require("../prisma/client");
+const {
+  BALANCE_TYPES,
+  createTransactionLogs,
+} = require("./transactionLogService");
 
 const getAllSales = async ({ search, startDate, endDate }) => {
   const where = {};
@@ -49,6 +54,7 @@ const createSale = async ({
   const totalQuantity = Number(TotalQuantity);
   const totalPay = Number(totalPayment);
   const saleDate = saleDateInput ? new Date(saleDateInput) : new Date();
+  const balancesBefore = await getCards({});
 
   const startOfDay = new Date(saleDate);
   startOfDay.setHours(0, 0, 0, 0);
@@ -176,6 +182,24 @@ const createSale = async ({
 
     createdSales.push(sale);
   }
+  await createTransactionLogs({
+    modulId: headersale.id,
+    modul: "sales",
+    entries: [
+      {
+        balanceType: BALANCE_TYPES.CASH_UNSETTLED,
+        type: "IN",
+        amount: cashAmount,
+        balanceBefore: balancesBefore.realtimeCashHold,
+      },
+      {
+        balanceType: BALANCE_TYPES.QRIS,
+        type: "IN",
+        amount: qrisAmount,
+        balanceBefore: balancesBefore.realtimeQris,
+      },
+    ],
+  });
 
   return {
     headersale,
